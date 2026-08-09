@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Galdr VERSION 1.0.0)
+project(Galdr VERSION 1.1.0)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -14,17 +14,19 @@ juce_add_binary_data(GaldrAssets
         assets/fonts/UnifrakturMaguntia.ttf
         assets/fonts/IMFellEnglish.ttf)
 
-# PLUGIN_MANUFACTURER_CODE and PLUGIN_CODE must never change after the first
-# public release, or saved DAW sessions will lose the plugin.
+# PLUGIN_MANUFACTURER_CODE and PLUGIN_CODE must never change after a public
+# release, or saved DAW sessions will lose the plugin. The manufacturer code
+# was rebranded Admu -> Sgnv once, right after 1.0.0; sessions saved with
+# 1.0.0 must re-add the plugin. It is frozen from here on.
 juce_add_plugin(Galdr
-    COMPANY_NAME "Andrea De Murtas"
-    BUNDLE_ID com.andreademurtas.galdr
+    COMPANY_NAME "Sognevo"
+    BUNDLE_ID com.sognevo.galdr
     IS_SYNTH TRUE
     NEEDS_MIDI_INPUT TRUE
     NEEDS_MIDI_OUTPUT FALSE
     IS_MIDI_EFFECT FALSE
     COPY_PLUGIN_AFTER_BUILD FALSE
-    PLUGIN_MANUFACTURER_CODE Admu
+    PLUGIN_MANUFACTURER_CODE Sgnv
     PLUGIN_CODE Gldr
     VST3_CATEGORIES Instrument Synth
     FORMATS VST3 AU Standalone
@@ -73,5 +75,5 @@ target_link_libraries(GaldrDemoRender PRIVATE
 # CLAP export (MIT-licensed wrapper around the JUCE plugin target)
 add_subdirectory(modules/clap-juce-extensions EXCLUDE_FROM_ALL)
 clap_juce_extensions_plugin(TARGET Galdr
-    CLAP_ID "com.andreademurtas.galdr"
+    CLAP_ID "com.sognevo.galdr"
     CLAP_FEATURES instrument synthesizer)
