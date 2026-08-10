@@ -53,6 +53,23 @@ target_link_libraries(Galdr
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags)
 
+# Headless DSP tests, run by CI on every platform.
+juce_add_console_app(GaldrTests PRODUCT_NAME "GaldrTests")
+target_sources(GaldrTests PRIVATE
+    tests/Tests.cpp
+    src/PluginProcessor.cpp
+    src/PluginEditor.cpp)
+target_compile_definitions(GaldrTests PRIVATE
+    JUCE_WEB_BROWSER=0
+    JUCE_USE_CURL=0
+    JUCE_DISPLAY_SPLASH_SCREEN=0
+    JucePlugin_Name="Galdr")
+target_link_libraries(GaldrTests PRIVATE
+    GaldrAssets
+    juce::juce_audio_utils
+    juce::juce_dsp
+    juce::juce_recommended_config_flags)
+
 # Offline demo renderer: plays the factory presets to a WAV for the demo video.
 # Built on demand, not part of the plugin targets.
 juce_add_console_app(GaldrDemoRender PRODUCT_NAME "GaldrDemoRender")

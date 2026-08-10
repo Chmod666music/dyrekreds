@@ -39,22 +39,44 @@ jobs:
       - name: Build
         run: cmake --build build --config Release --parallel
 
+      - name: Run unit tests
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            ./build/GaldrTests_artefacts/Release/GaldrTests.exe
+          elif [ "$RUNNER_OS" = "macOS" ]; then
+            ./build/GaldrTests_artefacts/Release/GaldrTests
+          else
+            xvfb-run --auto-servernum ./build/GaldrTests_artefacts/Release/GaldrTests
+          fi
+
+      # Strictness 10 is the ceiling: every test pluginval has, including the
+      # allocation and thread-safety checks.
       - name: Validate VST3 with pluginval
         shell: bash
         run: |
           if [ "$RUNNER_OS" = "Windows" ]; then
             curl -sLO https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Windows.zip
             7z x -y pluginval_Windows.zip > /dev/null
-            ./pluginval.exe --strictness-level 5 --validate "build/Galdr_artefacts/Release/VST3/Galdr.vst3"
+            ./pluginval.exe --strictness-level 10 --validate "build/Galdr_artefacts/Release/VST3/Galdr.vst3"
           elif [ "$RUNNER_OS" = "macOS" ]; then
             curl -sLO https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_macOS.zip
             unzip -q -o pluginval_macOS.zip
-            pluginval.app/Contents/MacOS/pluginval --strictness-level 5 --validate "build/Galdr_artefacts/Release/VST3/Galdr.vst3"
+            pluginval.app/Contents/MacOS/pluginval --strictness-level 10 --validate "build/Galdr_artefacts/Release/VST3/Galdr.vst3"
           else
             curl -sLO https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Linux.zip
             unzip -q -o pluginval_Linux.zip
-            xvfb-run --auto-servernum ./pluginval --strictness-level 5 --validate "build/Galdr_artefacts/Release/VST3/Galdr.vst3"
+            xvfb-run --auto-servernum ./pluginval --strictness-level 10 --validate "build/Galdr_artefacts/Release/VST3/Galdr.vst3"
           fi
+
+      # The AU wrapper only registers from the user plug-in folder.
+      - name: Validate AU with pluginval (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p ~/Library/Audio/Plug-Ins/Components
+          cp -R "build/Galdr_artefacts/Release/AU/Galdr.component" ~/Library/Audio/Plug-Ins/Components/
+          killall -9 AudioComponentRegistrar 2>/dev/null || true
+          pluginval.app/Contents/MacOS/pluginval --strictness-level 10 --validate ~/Library/Audio/Plug-Ins/Components/Galdr.component
 
       # pluginval has no CLAP support; clap-validator is the free-audio tool.
       # Pinned to an exact release asset because the names carry a build suffix.
