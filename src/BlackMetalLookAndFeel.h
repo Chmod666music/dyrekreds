@@ -49,6 +49,7 @@ public:
         setColour(juce::TextEditor::highlightColourId, theme::blood.withAlpha(0.4f));
         setColour(juce::CaretComponent::caretColourId, theme::bloodBright);
         setColour(juce::TextButton::buttonColourId, theme::iron);
+        setColour(juce::TextButton::buttonOnColourId, theme::blood.withAlpha(0.6f));
         setColour(juce::TextButton::textColourOffId, theme::bone);
         setColour(juce::TextButton::textColourOnId, theme::bone);
         setColour(juce::TooltipWindow::backgroundColourId, theme::panel);
@@ -82,10 +83,18 @@ public:
                               bool highlighted, bool down) override
     {
         auto r = button.getLocalBounds();
+
+        // Toggles wear their state: without this, an engaged toggle is pixel
+        // identical to a disengaged one and the button reads as a label.
+        // (Found in Gjalla, whose pedal and gate switches were invisible.)
+        const auto resting = button.getToggleState()
+                                 ? button.findColour(juce::TextButton::buttonOnColourId)
+                                 : theme::iron;
+
         g.setColour(down ? theme::blood.withAlpha(0.5f)
-                         : highlighted ? theme::iron.brighter(0.3f) : theme::iron);
+                         : highlighted ? resting.brighter(0.3f) : resting);
         g.fillRect(r);
-        g.setColour(theme::outline);
+        g.setColour(button.getToggleState() ? theme::bloodBright.withAlpha(0.7f) : theme::outline);
         g.drawRect(r, 1);
     }
 
