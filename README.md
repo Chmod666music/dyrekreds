@@ -3,7 +3,8 @@
 [![Build](https://github.com/andreademurtas/galdr/actions/workflows/build.yml/badge.svg)](https://github.com/andreademurtas/galdr/actions/workflows/build.yml)
 
 *Galdr* (Old Norse for a spell sung rather than spoken) is a free and open-source
-synthesizer plugin (VST3, CLAP, AU + standalone) with a black-metal soul, built with [JUCE](https://juce.com).
+synthesizer plugin (VST3, CLAP, AU + standalone) made with black metal and other
+dark music in mind, built with [JUCE](https://juce.com).
 
 ![Galdr GUI](docs/screenshot.png)
 
