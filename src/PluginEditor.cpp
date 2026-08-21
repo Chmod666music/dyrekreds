@@ -605,6 +605,16 @@ void GaldrAudioProcessorEditor::paint(juce::Graphics& g)
 
     // header
     auto sc = [scale](int v) { return juce::roundToInt((float) v * scale); };
+
+    // A faint horizon glow, echoing the warm light across the album series.
+    juce::ColourGradient horizonGlow(
+    theme::bloodBright.withAlpha(0.10f),
+    (float) sc(500), (float) sc(42),
+    juce::Colours::transparentBlack,
+    (float) sc(500), (float) sc(125), true);
+
+    g.setGradientFill(horizonGlow);
+    g.fillRect(sc(400), 0, sc(300), sc(78));
     auto titleArea = juce::Rectangle<int>(sc(20), sc(8), sc(430), sc(40));
     g.setFont(lnf.getTitleFont(30.0f * scale));
     g.setColour(theme::blood.withAlpha(0.45f));
@@ -651,6 +661,23 @@ void GaldrAudioProcessorEditor::paint(juce::Graphics& g)
     g.fillEllipse(sealCentre.x - 1.8f * scale,
               sealCentre.y - 1.8f * scale,
               3.6f * scale, 3.6f * scale);
+    // Sparse celestial guide marks around the seal.
+    g.setColour(theme::outline.withAlpha(0.42f));
+    g.drawLine(sealCentre.x - sealRadius * 1.85f, sealCentre.y,
+           sealCentre.x - sealRadius * 1.18f, sealCentre.y,
+           1.0f * scale);
+    g.drawLine(sealCentre.x + sealRadius * 1.18f, sealCentre.y,
+           sealCentre.x + sealRadius * 1.85f, sealCentre.y,
+           1.0f * scale);
+
+    g.setColour(theme::boneDim.withAlpha(0.48f));
+    const float starRadius = 1.2f * scale;
+    g.fillEllipse(sealCentre.x - sealRadius * 1.55f - starRadius,
+              sealCentre.y - starRadius,
+              starRadius * 2.0f, starRadius * 2.0f);
+    g.fillEllipse(sealCentre.x + sealRadius * 1.55f - starRadius,
+              sealCentre.y - starRadius,
+              starRadius * 2.0f, starRadius * 2.0f);
 
     // section panels
     for (const auto& s : sections)
