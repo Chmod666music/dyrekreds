@@ -656,10 +656,26 @@ void GaldrAudioProcessorEditor::paint(juce::Graphics& g)
     for (const auto& s : sections)
     {
         auto b = s.bounds;
-        g.setColour(theme::panel.withAlpha(0.55f));
-        g.fillRect(b);
-        g.setColour(theme::outline.withAlpha(0.8f));
-        g.drawRect(b, 1);
+
+juce::ColourGradient stone(
+    theme::panel.brighter(0.08f).withAlpha(0.84f),
+    (float) b.getX(), (float) b.getY(),
+    theme::iron.darker(0.12f).withAlpha(0.92f),
+    (float) b.getX(), (float) b.getBottom(), false);
+
+    g.setGradientFill(stone);
+    g.fillRect(b);
+
+    g.setColour(theme::outline.withAlpha(0.72f));
+    g.drawRect(b, 1);
+
+    g.setColour(theme::boneDim.withAlpha(0.08f));
+    g.drawRect(b.reduced(sc(2)), 1);
+
+    g.setColour(theme::outline.withAlpha(0.28f));
+    g.drawHorizontalLine(b.getY() + 1,
+                     (float) b.getX() + sc(2),
+                     (float) b.getRight() - sc(2));
 
         g.setFont(lnf.getBodyFont(15.0f * scale));
         g.setColour(theme::boneDim);
