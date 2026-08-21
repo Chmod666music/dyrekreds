@@ -8,14 +8,14 @@
 
 namespace theme
 {
-    inline const juce::Colour background  { 0xff0a0a0c };
-    inline const juce::Colour panel       { 0xff141416 };
-    inline const juce::Colour outline     { 0xff2e2e34 };
-    inline const juce::Colour bone        { 0xffcfc6b4 };
-    inline const juce::Colour boneDim     { 0xff8d8678 };
-    inline const juce::Colour blood       { 0xff8f1010 };
-    inline const juce::Colour bloodBright { 0xffb31515 };
-    inline const juce::Colour iron        { 0xff1d1d22 };
+    inline const juce::Colour background  { 0xff0b1116 }; // deep night
+    inline const juce::Colour panel       { 0xff151d23 }; // blue-grey slate
+    inline const juce::Colour outline     { 0xff48443b }; // muted bronze
+    inline const juce::Colour bone        { 0xffe7decc }; // warm ivory
+    inline const juce::Colour boneDim     { 0xff9f998d }; // weathered inscription
+    inline const juce::Colour blood       { 0xffa66b2b }; // deep amber
+    inline const juce::Colour bloodBright { 0xffd5a653 }; // returning sunlight
+    inline const juce::Colour iron        { 0xff1b252c }; // carved stone
 }
 
 class BlackMetalLookAndFeel : public juce::LookAndFeel_V4
@@ -33,7 +33,7 @@ public:
         setColour(juce::Slider::textBoxBackgroundColourId, juce::Colours::transparentBlack);
         setColour(juce::Slider::textBoxHighlightColourId, theme::blood.withAlpha(0.4f));
         setColour(juce::Slider::trackColourId, theme::blood);
-        setColour(juce::Slider::backgroundColourId, juce::Colour(0xff26262b));
+        setColour(juce::Slider::backgroundColourId, juce::Colour(0xff28343c));
         setColour(juce::Slider::thumbColourId, theme::bone);
         setColour(juce::BubbleComponent::backgroundColourId, theme::panel);
         setColour(juce::BubbleComponent::outlineColourId, theme::outline);
@@ -111,7 +111,7 @@ public:
         juce::Path track;
         track.addCentredArc(centre.x, centre.y, arcRadius, arcRadius, 0.0f,
                             rotaryStartAngle, rotaryEndAngle, true);
-        g.setColour(juce::Colour(0xff26262b));
+        g.setColour(juce::Colour(0xff28343c));
         g.strokePath(track, juce::PathStrokeType(3.0f, juce::PathStrokeType::curved));
 
         // value arc: wide translucent pass first for an ember-like glow
@@ -126,7 +126,7 @@ public:
         auto knobRadius = radius * 0.68f;
         auto knobArea = juce::Rectangle<float>(knobRadius * 2.0f, knobRadius * 2.0f).withCentre(centre);
         juce::ColourGradient body(theme::iron.brighter(0.25f), centre.x, centre.y - knobRadius,
-                                  juce::Colour(0xff0d0d10), centre.x, centre.y + knobRadius, false);
+                                  juce::Colour(0xff090e12), centre.x, centre.y + knobRadius, false);
         g.setGradientFill(body);
         g.fillEllipse(knobArea);
         g.setColour(theme::outline);
