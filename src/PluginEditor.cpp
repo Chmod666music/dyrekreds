@@ -332,6 +332,89 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
             });
     };
     addAndMakeVisible(tuningButton);
+               // ---- sample source
+    const auto updateSampleButton = [this]
+    {
+        const auto name = processorRef.getSampleName();
+        const bool hasSample = name.isNotEmpty();
+
+        sampleButton.setButtonText(hasSample ? "Sample \xE2\x80\xA2"
+                                             : "Sample");
+
+        sampleButton.setTooltip(
+            hasSample ? "Loaded sample: " + name
+                      : juce::String("Load a WAV or AIFF sample"));
+    };
+
+    updateSampleButton();
+
+    sampleButton.onClick = [this, updateSampleButton]
+    {
+        juce::PopupMenu menu;
+        menu.setLookAndFeel(&lnf);
+
+        const auto sampleName = processorRef.getSampleName();
+        const bool hasSample = sampleName.isNotEmpty();
+
+        menu.addSectionHeader("SAMPLE SOURCE");
+        menu.addItem(3,
+                     hasSample ? "Active: " + sampleName
+                               : juce::String("No sample loaded"),
+                     false,
+                     false);
+        menu.addSeparator();
+        menu.addItem(1, "Load WAV or AIFF...");
+        menu.addItem(2, "Clear sample", hasSample);
+
+        menu.showMenuAsync(
+            juce::PopupMenu::Options().withTargetComponent(sampleButton),
+            [this, updateSampleButton](int menuResult)
+            {
+                if (menuResult == 1)
+                {
+                    sampleChooser = std::make_unique<juce::FileChooser>(
+                        "Load sample",
+                        juce::File::getSpecialLocation(
+                            juce::File::userMusicDirectory),
+                        "*.wav;*.aif;*.aiff");
+
+                    sampleChooser->launchAsync(
+                        juce::FileBrowserComponent::openMode
+                            | juce::FileBrowserComponent::canSelectFiles,
+                        [this, updateSampleButton](
+                            const juce::FileChooser& fc)
+                        {
+                            const auto file = fc.getResult();
+
+                            if (! file.existsAsFile())
+                                return;
+
+                            const auto loadResult =
+                                processorRef.loadSample(file);
+
+                            if (loadResult)
+                            {
+                                updateSampleButton();
+                            }
+                            else
+                            {
+                                juce::AlertWindow::showMessageBoxAsync(
+                                    juce::MessageBoxIconType::WarningIcon,
+                                    "Sample import failed",
+                                    loadResult.error);
+                            }
+                        });
+                }
+                else if (menuResult == 2)
+                {
+                    processorRef.clearSample();
+                    updateSampleButton();
+                }
+            });
+    };
+
+    addAndMakeVisible(sampleButton);
+
 
     // ---- keyboard
     keyboard.setColour(juce::MidiKeyboardComponent::whiteNoteColourId, juce::Colour(0xffc9c1b1));
@@ -578,7 +661,8 @@ void GaldrAudioProcessorEditor::resized()
                      sc(s.baseBounds.getWidth()), sc(s.baseBounds.getHeight()) };
         layoutSection(s, scale);
     }
-
+    sampleButton.setBounds(sc(360), sc(20), sc(110), sc(26));
+    tuningButton.setBounds(sc(baseW - 690), sc(20), sc(104), sc(26));
     tuningButton.setBounds(sc(baseW - 690), sc(20), sc(104), sc(26));
     undoButton.setBounds(sc(baseW - 578), sc(20), sc(52), sc(26));
     redoButton.setBounds(sc(baseW - 522), sc(20), sc(52), sc(26));

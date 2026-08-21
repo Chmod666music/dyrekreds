@@ -86,8 +86,10 @@ private:
     juce::TextButton presetNameButton;
     juce::TextButton undoButton { "Undo" }, redoButton { "Redo" };
     juce::TextButton saveButton { "Save" }, tuningButton;
+    juce::TextButton sampleButton { "Sample" };
     juce::TooltipWindow tooltipWindow { this };
     std::unique_ptr<juce::FileChooser> chooser;
+    std::unique_ptr<juce::FileChooser> sampleChooser;
     std::unique_ptr<PresetBrowser> presetBrowser;
 
     juce::OwnedArray<Knob> knobs;
