@@ -618,6 +618,39 @@ void GaldrAudioProcessorEditor::paint(juce::Graphics& g)
     g.setColour(theme::boneDim);
     g.drawText("F U I M A D A N E", sc(22), sc(47), sc(300), sc(15),
            juce::Justification::centredLeft);
+    // Dyrekreds celestial seal — a restrained echo of the album artwork.
+    const juce::Point<float> sealCentre((float) sc(500), (float) sc(33));
+    const float sealRadius = (float) sc(18);
+
+    g.setColour(theme::outline.withAlpha(0.72f));
+    g.drawEllipse(sealCentre.x - sealRadius, sealCentre.y - sealRadius,
+              sealRadius * 2.0f, sealRadius * 2.0f, 1.0f * scale);
+    g.drawEllipse(sealCentre.x - sealRadius * 0.62f,
+              sealCentre.y - sealRadius * 0.62f,
+              sealRadius * 1.24f, sealRadius * 1.24f, 1.0f * scale);
+
+    for (int i = 0; i < 12; ++i)
+    {
+    const float angle = juce::MathConstants<float>::twoPi * (float) i / 12.0f;
+    const float inner = sealRadius * 0.76f;
+    const float outer = sealRadius * 0.96f;
+
+    g.drawLine(sealCentre.x + std::cos(angle) * inner,
+               sealCentre.y + std::sin(angle) * inner,
+               sealCentre.x + std::cos(angle) * outer,
+               sealCentre.y + std::sin(angle) * outer,
+               1.0f * scale);
+    }
+
+    g.setColour(theme::bloodBright.withAlpha(0.82f));
+    g.drawLine(sealCentre.x - sealRadius * 0.42f, sealCentre.y,
+           sealCentre.x + sealRadius * 0.42f, sealCentre.y, 1.0f * scale);
+    g.drawLine(sealCentre.x, sealCentre.y - sealRadius * 0.42f,
+           sealCentre.x, sealCentre.y + sealRadius * 0.42f, 1.0f * scale);
+
+    g.fillEllipse(sealCentre.x - 1.8f * scale,
+              sealCentre.y - 1.8f * scale,
+              3.6f * scale, 3.6f * scale);
 
     // section panels
     for (const auto& s : sections)
