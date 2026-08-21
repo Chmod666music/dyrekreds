@@ -170,6 +170,7 @@ public:
 {
     const juce::Graphics::ScopedSaveState state(g);
     g.setOpacity(slider.isEnabled() ? 1.0f : 0.34f);
+    const bool hovered = slider.isMouseOverOrDragging();
 
     if (style != juce::Slider::LinearHorizontal)
 {
@@ -185,11 +186,12 @@ public:
     const float valueX = juce::jlimit(startX, endX, sliderPos);
 
     // Recessed stone track.
-    g.setColour(juce::Colour(0xff28343c));
+    g.setColour(hovered ? juce::Colour(0xff34444e)
+                        : juce::Colour(0xff28343c));
     g.drawLine(startX, centreY, endX, centreY, 4.0f * uiScale);
 
     // Warm orbital value trail.
-    g.setColour(theme::blood.withAlpha(0.28f));
+    g.setColour(theme::blood.withAlpha(hovered ? 0.42f : 0.28f));
     g.drawLine(startX, centreY, valueX, centreY, 7.0f * uiScale);
     g.setColour(theme::bloodBright.withAlpha(0.9f));
     g.drawLine(startX, centreY, valueX, centreY, 2.0f * uiScale);
@@ -199,7 +201,7 @@ public:
     g.setColour(theme::bone);
     g.fillEllipse(valueX - nodeRadius, centreY - nodeRadius,
                   nodeRadius * 2.0f, nodeRadius * 2.0f);
-    g.setColour(theme::bloodBright.withAlpha(0.75f));
+    g.setColour(theme::bloodBright.withAlpha(hovered ? 0.98f : 0.75f));
     g.drawEllipse(valueX - nodeRadius, centreY - nodeRadius,
                   nodeRadius * 2.0f, nodeRadius * 2.0f,
                   1.0f * uiScale);
@@ -210,6 +212,7 @@ public:
     {
         const juce::Graphics::ScopedSaveState state(g);
         g.setOpacity(slider.isEnabled() ? 1.0f : 0.34f);
+        const bool hovered = slider.isMouseOverOrDragging();
         auto bounds = juce::Rectangle<int>(x, y, width, height).toFloat().reduced(6.0f);
         auto radius = juce::jmin(bounds.getWidth(), bounds.getHeight()) / 2.0f;
         auto centre = bounds.getCentre();
@@ -219,14 +222,15 @@ public:
         juce::Path track;
         track.addCentredArc(centre.x, centre.y, arcRadius, arcRadius, 0.0f,
                             rotaryStartAngle, rotaryEndAngle, true);
-        g.setColour(juce::Colour(0xff28343c));
+        g.setColour(hovered ? juce::Colour(0xff34444e)
+                            : juce::Colour(0xff28343c));
         g.strokePath(track, juce::PathStrokeType(3.0f, juce::PathStrokeType::curved));
 
         // value arc: wide translucent pass first for an ember-like glow
         juce::Path value;
         value.addCentredArc(centre.x, centre.y, arcRadius, arcRadius, 0.0f,
                             rotaryStartAngle, angle, true);
-        g.setColour(theme::blood.withAlpha(0.35f));
+        g.setColour(theme::blood.withAlpha(hovered ? 0.48f : 0.35f));
         g.strokePath(value, juce::PathStrokeType(7.0f, juce::PathStrokeType::curved));
         g.setColour(theme::bloodBright);
         g.strokePath(value, juce::PathStrokeType(2.5f, juce::PathStrokeType::curved));
@@ -237,8 +241,10 @@ public:
                                   juce::Colour(0xff090e12), centre.x, centre.y + knobRadius, false);
         g.setGradientFill(body);
         g.fillEllipse(knobArea);
-        g.setColour(theme::outline);
-        g.drawEllipse(knobArea, 1.5f);
+        g.setColour(hovered
+                        ? theme::bloodBright.withAlpha(0.46f)
+                        : theme::outline);
+        g.drawEllipse(knobArea, hovered ? 2.0f : 1.5f);
         // Fine inner orbit and central ember.
         auto innerOrbit = knobArea.reduced(knobRadius * 0.22f);
         g.setColour(theme::boneDim.withAlpha(0.16f));
