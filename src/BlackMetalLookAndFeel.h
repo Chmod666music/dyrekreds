@@ -35,6 +35,12 @@ public:
         setColour(juce::Slider::trackColourId, theme::blood);
         setColour(juce::Slider::backgroundColourId, juce::Colour(0xff28343c));
         setColour(juce::Slider::thumbColourId, theme::bone);
+        setColour(juce::ScrollBar::backgroundColourId,
+          theme::background.withAlpha(0.55f));
+        setColour(juce::ScrollBar::trackColourId,
+          theme::iron.withAlpha(0.85f));
+        setColour(juce::ScrollBar::thumbColourId,
+          theme::bloodBright.withAlpha(0.78f));
         setColour(juce::BubbleComponent::backgroundColourId, theme::panel);
         setColour(juce::BubbleComponent::outlineColourId, theme::outline);
         setColour(juce::ComboBox::backgroundColourId, theme::iron);

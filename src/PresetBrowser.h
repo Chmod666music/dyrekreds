@@ -158,13 +158,48 @@ public:
         const float scale = lnf.uiScale;
         auto sc = [scale](int v) { return juce::roundToInt((float) v * scale); };
 
-        g.fillAll(juce::Colour(0xcc06060a));
+        // Dim the instrument behind the browser with a deep celestial veil.
+    g.fillAll(theme::background.withAlpha(0.94f));
 
-        auto box = innerRect();
-        g.setColour(theme::panel);
-        g.fillRect(box);
-        g.setColour(theme::outline);
-        g.drawRect(box, 2);
+    auto box = innerRect();
+
+    // Layered blue-grey stone surface.
+    juce::ColourGradient stone(
+    theme::panel.brighter(0.10f),
+    0.0f, (float) box.getY(),
+    theme::background.brighter(0.03f),
+    0.0f, (float) box.getBottom(),
+    false);
+
+    g.setGradientFill(stone);
+    g.fillRoundedRectangle(box.toFloat(), (float) sc(3));
+
+    // Bronze outer and inner frames.
+    g.setColour(theme::outline.withAlpha(0.90f));
+    g.drawRoundedRectangle(box.toFloat().reduced(0.5f),
+                       (float) sc(3), (float) sc(2));
+
+    g.setColour(theme::bloodBright.withAlpha(0.16f));
+    g.drawRoundedRectangle(box.toFloat().reduced((float) sc(4)),
+                       (float) sc(2), 1.0f);
+
+    // A restrained horizon glow behind the browser title.
+    juce::ColourGradient titleGlow(
+    theme::bloodBright.withAlpha(0.11f),
+    (float) box.getCentreX(), (float) box.getY(),
+    juce::Colours::transparentBlack,
+    (float) box.getCentreX(), (float) (box.getY() + sc(90)),
+    false);
+
+    g.setGradientFill(titleGlow);
+    g.fillRect(box.getX() + sc(2), box.getY() + sc(2),
+           box.getWidth() - sc(4), sc(88));
+
+    // Fine bronze division beneath the title.
+    g.setColour(theme::blood.withAlpha(0.45f));
+    g.drawHorizontalLine(box.getY() + sc(54),
+                     (float) (box.getX() + sc(14)),
+                     (float) (box.getRight() - sc(14)));
 
         g.setFont(lnf.getTitleFont(30.0f * scale));
         g.setColour(theme::bone);
