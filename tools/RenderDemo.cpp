@@ -92,7 +92,7 @@ int main(int argc, char* argv[])
     const int blockSize = 512;
     const double gapSeconds = 0.8;
 
-    auto wavFile = outDir.getChildFile("galdr-demo.wav");
+    auto wavFile = outDir.getChildFile("dyrekreds-demo.wav");
     wavFile.deleteFile();
     juce::WavAudioFormat wavFormat;
     std::unique_ptr<juce::AudioFormatWriter> writer(wavFormat.createWriterFor(

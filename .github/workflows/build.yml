@@ -43,11 +43,11 @@ jobs:
         shell: bash
         run: |
           if [ "$RUNNER_OS" = "Windows" ]; then
-            ./build/GaldrTests_artefacts/Release/GaldrTests.exe
+            ./build/DyrekredsTests_artefacts/Release/DyrekredsTests.exe
           elif [ "$RUNNER_OS" = "macOS" ]; then
-            ./build/GaldrTests_artefacts/Release/GaldrTests
+            ./build/DyrekredsTests_artefacts/Release/DyrekredsTests
           else
-            xvfb-run --auto-servernum ./build/GaldrTests_artefacts/Release/GaldrTests
+            xvfb-run --auto-servernum ./build/DyrekredsTests_artefacts/Release/DyrekredsTests
           fi
 
       # Strictness 10 is the ceiling: every test pluginval has, including the
@@ -58,15 +58,15 @@ jobs:
           if [ "$RUNNER_OS" = "Windows" ]; then
             curl -sLO https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Windows.zip
             7z x -y pluginval_Windows.zip > /dev/null
-            ./pluginval.exe --strictness-level 10 --validate "build/Galdr_artefacts/Release/VST3/Galdr.vst3"
+            ./pluginval.exe --strictness-level 10 --validate "build/Dyrekreds_artefacts/Release/VST3/Dyrekreds.vst3"
           elif [ "$RUNNER_OS" = "macOS" ]; then
             curl -sLO https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_macOS.zip
             unzip -q -o pluginval_macOS.zip
-            pluginval.app/Contents/MacOS/pluginval --strictness-level 10 --validate "build/Galdr_artefacts/Release/VST3/Galdr.vst3"
+            pluginval.app/Contents/MacOS/pluginval --strictness-level 10 --validate "build/Dyrekreds_artefacts/Release/VST3/Dyrekreds.vst3"
           else
             curl -sLO https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Linux.zip
             unzip -q -o pluginval_Linux.zip
-            xvfb-run --auto-servernum ./pluginval --strictness-level 10 --validate "build/Galdr_artefacts/Release/VST3/Galdr.vst3"
+            xvfb-run --auto-servernum ./pluginval --strictness-level 10 --validate "build/Dyrekreds_artefacts/Release/VST3/Dyrekreds.vst3"
           fi
 
       # The AU wrapper only registers from the user plug-in folder.
@@ -74,14 +74,14 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           mkdir -p ~/Library/Audio/Plug-Ins/Components
-          cp -R "build/Galdr_artefacts/Release/AU/Galdr.component" ~/Library/Audio/Plug-Ins/Components/
+          cp -R "build/Dyrekreds_artefacts/Release/AU/Dyrekreds.component" ~/Library/Audio/Plug-Ins/Components/
           killall -9 AudioComponentRegistrar 2>/dev/null || true
-          pluginval.app/Contents/MacOS/pluginval --strictness-level 10 --validate ~/Library/Audio/Plug-Ins/Components/Galdr.component
+          pluginval.app/Contents/MacOS/pluginval --strictness-level 10 --validate ~/Library/Audio/Plug-Ins/Components/Dyrekreds.component
 
       # pluginval has no CLAP support; clap-validator is the free-audio tool.
       # Pinned to an exact release asset because the names carry a build suffix.
       # The state-reproducibility tests are excluded: clap-juce-extensions (at
-      # upstream head) fails them for every JUCE/APVTS plugin, Galdr included;
+      # upstream head) fails them for every JUCE/APVTS plugin, Dyrekreds included;
       # values restored via setStateInformation read back as defaults through
       # the CLAP params extension. Re-enable once the wrapper is fixed upstream.
       - name: Validate CLAP with clap-validator
@@ -93,7 +93,7 @@ jobs:
           if [ "$RUNNER_OS" = "Windows" ]; then
             curl -sLO "$base/$stem-windows.zip"
             7z x -y "$stem-windows.zip" -ovalidator > /dev/null
-            validator/clap-validator.exe validate -x state-reproducibility "build/Galdr_artefacts/Release/CLAP/Galdr.clap"
+            validator/clap-validator.exe validate -x state-reproducibility "build/Dyrekreds_artefacts/Release/CLAP/Dyrekreds.clap"
           else
             # The unix release zips wrap a tarball with the binary at binaries/clap-validator.
             [ "$RUNNER_OS" = "macOS" ] && asset="$stem-macos-universal.zip" || asset="$stem-ubuntu-22.04.zip"
@@ -103,9 +103,9 @@ jobs:
             bin=$(find validator -type f -name clap-validator | head -1)
             chmod +x "$bin"
             if [ "$RUNNER_OS" = "Linux" ]; then
-              xvfb-run --auto-servernum "$bin" validate -x state-reproducibility "build/Galdr_artefacts/Release/CLAP/Galdr.clap"
+              xvfb-run --auto-servernum "$bin" validate -x state-reproducibility "build/Dyrekreds_artefacts/Release/CLAP/Dyrekreds.clap"
             else
-              "$bin" validate -x state-reproducibility "build/Galdr_artefacts/Release/CLAP/Galdr.clap"
+              "$bin" validate -x state-reproducibility "build/Dyrekreds_artefacts/Release/CLAP/Dyrekreds.clap"
             fi
           fi
 
@@ -113,7 +113,7 @@ jobs:
         shell: bash
         run: |
           mkdir dist
-          stage=build/Galdr_artefacts/Release
+          stage=build/Dyrekreds_artefacts/Release
           cp LICENSE "$stage/LICENSE.txt"
           cp NOTICE.txt "$stage/NOTICE.txt"
           mkdir "$stage/licenses"
@@ -128,30 +128,30 @@ jobs:
             [ -d "$d" ] && dirs="$dirs $d"
           done
           if [ "$RUNNER_OS" = "Windows" ]; then
-            cmake -E tar cf "../../../dist/Galdr-Windows.zip" --format=zip $dirs
+            cmake -E tar cf "../../../dist/Dyrekreds-Windows.zip" --format=zip $dirs
           else
             # tar preserves the executable bits that zip would lose
-            tar czf "../../../dist/Galdr-$RUNNER_OS.tar.gz" $dirs
+            tar czf "../../../dist/Dyrekreds-$RUNNER_OS.tar.gz" $dirs
           fi
 
       - name: Render audio demos
         if: runner.os == 'Linux'
         run: |
-          cmake --build build --config Release --parallel --target GaldrDemoRender
-          xvfb-run --auto-servernum ./build/GaldrDemoRender_artefacts/Release/GaldrDemoRender demo-out
+          cmake --build build --config Release --parallel --target DyrekredsDemoRender
+          xvfb-run --auto-servernum ./build/DyrekredsDemoRender_artefacts/Release/DyrekredsDemoRender demo-out
           sed -i 's/\r$//' demo-out/segments.txt
           i=0
           while IFS='|' read -r _ name start dur; do
             i=$((i+1))
             slug=$(printf "%02d-%s" "$i" "$(echo "$name" | tr 'A-Z' 'a-z' | tr ' ' '-')")
-            ffmpeg -nostdin -loglevel error -y -ss "$start" -t "$dur" -i demo-out/galdr-demo.wav \
+            ffmpeg -nostdin -loglevel error -y -ss "$start" -t "$dur" -i demo-out/dyrekreds-demo.wav \
               -c:a libmp3lame -b:a 256k "dist/$slug.mp3"
           done < demo-out/segments.txt
-          ffmpeg -nostdin -loglevel error -y -i demo-out/galdr-demo.wav -c:a libmp3lame -b:a 256k dist/galdr-demo-full.mp3
+          ffmpeg -nostdin -loglevel error -y -i demo-out/dyrekreds-demo.wav -c:a libmp3lame -b:a 256k dist/dyrekreds-demo-full.mp3
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Galdr-${{ runner.os }}
+          name: Dyrekreds-${{ runner.os }}
           path: dist/*
 
   release:
