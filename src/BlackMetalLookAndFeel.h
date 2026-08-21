@@ -129,6 +129,8 @@ public:
     void drawButtonBackground(juce::Graphics& g, juce::Button& button,
                           const juce::Colour&, bool highlighted, bool down) override
 {
+    const juce::Graphics::ScopedSaveState state(g);
+    g.setOpacity(button.isEnabled() ? 1.0f : 0.34f);
     auto bounds = button.getLocalBounds().toFloat().reduced(0.5f);
     const float corner = 2.5f * uiScale;
 
@@ -166,13 +168,16 @@ public:
                       float sliderPos, float minSliderPos, float maxSliderPos,
                       juce::Slider::SliderStyle style, juce::Slider& slider) override
 {
+    const juce::Graphics::ScopedSaveState state(g);
+    g.setOpacity(slider.isEnabled() ? 1.0f : 0.34f);
+
     if (style != juce::Slider::LinearHorizontal)
-    {
-        juce::LookAndFeel_V4::drawLinearSlider(
-            g, x, y, width, height, sliderPos,
-            minSliderPos, maxSliderPos, style, slider);
-        return;
-    }
+{
+    juce::LookAndFeel_V4::drawLinearSlider(
+        g, x, y, width, height, sliderPos,
+        minSliderPos, maxSliderPos, style, slider);
+    return;
+}
 
     const float startX = (float) x + 5.0f * uiScale;
     const float endX = (float) (x + width) - 5.0f * uiScale;
@@ -201,8 +206,10 @@ public:
 }
     void drawRotarySlider(juce::Graphics& g, int x, int y, int width, int height,
                           float sliderPos, float rotaryStartAngle, float rotaryEndAngle,
-                          juce::Slider&) override
+                          juce::Slider& slider) override
     {
+        const juce::Graphics::ScopedSaveState state(g);
+        g.setOpacity(slider.isEnabled() ? 1.0f : 0.34f);
         auto bounds = juce::Rectangle<int>(x, y, width, height).toFloat().reduced(6.0f);
         auto radius = juce::jmin(bounds.getWidth(), bounds.getHeight()) / 2.0f;
         auto centre = bounds.getCentre();
@@ -256,6 +263,8 @@ public:
     void drawComboBox(juce::Graphics& g, int width, int height, bool,
                   int, int, int, int, juce::ComboBox& box) override
 {
+    const juce::Graphics::ScopedSaveState state(g);
+    g.setOpacity(box.isEnabled() ? 1.0f : 0.34f);
     juce::Rectangle<int> bounds(0, 0, width, height);
     auto face = bounds.toFloat().reduced(0.5f);
     const float corner = 2.0f * uiScale;
