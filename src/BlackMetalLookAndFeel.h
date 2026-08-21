@@ -131,11 +131,22 @@ public:
         g.fillEllipse(knobArea);
         g.setColour(theme::outline);
         g.drawEllipse(knobArea, 1.5f);
+        // Fine inner orbit and central ember.
+        auto innerOrbit = knobArea.reduced(knobRadius * 0.22f);
+        g.setColour(theme::boneDim.withAlpha(0.16f));
+        g.drawEllipse(innerOrbit, 1.0f);
+
+        const float emberRadius = 1.5f + sliderPos * 0.8f;
+        g.setColour(theme::bloodBright.withAlpha(0.22f + sliderPos * 0.28f));
+        g.fillEllipse(centre.x - emberRadius, centre.y - emberRadius,
+              emberRadius * 2.0f, emberRadius * 2.0f);
 
         juce::Path pointer;
-        pointer.addTriangle(0.0f, -(knobRadius - 4.0f),
-                            -2.8f, -knobRadius * 0.25f,
-                            2.8f, -knobRadius * 0.25f);
+        pointer.startNewSubPath(0.0f, -(knobRadius - 3.0f));
+        pointer.lineTo(-2.2f, -knobRadius * 0.18f);
+        pointer.lineTo(0.0f, knobRadius * 0.10f);
+        pointer.lineTo(2.2f, -knobRadius * 0.18f);
+        pointer.closeSubPath();
         pointer.applyTransform(juce::AffineTransform::rotation(angle).translated(centre.x, centre.y));
         g.setColour(theme::bone);
         g.fillPath(pointer);
