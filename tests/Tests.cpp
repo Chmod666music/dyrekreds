@@ -225,6 +225,31 @@ void testSampleLoading()
     check(peakIn(sampleRender, sampleRate, 0.005, 0.09) > 0.01f,
           "loaded sample renders from MIDI with oscillators muted");
 
+    const float rootC4Frequency =
+        measureFreq(sampleRender, sampleRate, 0.005, 0.09);
+
+    check(std::abs(rootC4Frequency / 220.0f - 1.0f) < 0.01f,
+          "root C4 preserves the sample pitch");
+
+    setParam(processor, pid::sampleRoot, 72.0f);
+
+    const auto rootC5Render =
+        render(processor, sampleRate, 128, 0.12, sampleEvents);
+
+    const float rootC5Frequency =
+        measureFreq(rootC5Render, sampleRate, 0.005, 0.09);
+
+    check(std::abs(rootC5Frequency / 110.0f - 1.0f) < 0.01f,
+          "root C5 transposes the sample down one octave");
+
+    setParam(processor, pid::sampleLvl, 0.0f);
+
+    const auto mutedSampleRender =
+        render(processor, sampleRate, 128, 0.12, sampleEvents);
+
+    check(peakIn(mutedSampleRender, sampleRate, 0.005, 0.09) < 1.0e-5f,
+          "sample level can mute the sample source");
+
     const auto sampleBeforeFailure = processor.currentSample();
 
     const auto failed = processor.loadSample(

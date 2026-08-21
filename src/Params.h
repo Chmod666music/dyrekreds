@@ -32,6 +32,10 @@ namespace pid
     inline constexpr auto noiseType  = "noiseType";
     inline constexpr auto noiseLvl   = "noiseLvl";
 
+    // Dyrekreds sample source
+    inline constexpr auto sampleLvl  = "sampleLvl";
+    inline constexpr auto sampleRoot = "sampleRoot";
+
     // filter
     inline constexpr auto filterType  = "filterType";
     inline constexpr auto cutoff      = "cutoff";

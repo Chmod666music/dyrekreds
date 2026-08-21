@@ -52,6 +52,8 @@ public:
 
         // Published atomically by the processor and acquired when a note starts.
         const std::shared_ptr<const dyrekreds::SampleData>* sampleSource = nullptr;
+        float sampleLvl = 0.7f;
+        int sampleRoot = 60;
 
         int   filterType = 0;
         float cutoff = 12000.0f, resonance = 0.2f, filterDrive = 0.0f;
@@ -309,11 +311,11 @@ public:
                         juce::jmin(1,
                             voiceSample->audio.getNumChannels() - 1);
 
-                    constexpr float sampleGain = 0.7f;
-                    l += readInterpolated(0) * sampleGain;
-                    r += readInterpolated(rightChannel) * sampleGain;
+                    l += readInterpolated(0) * settings.sampleLvl;
+                    r += readInterpolated(rightChannel) * settings.sampleLvl;
 
-                    const float rootFrequency = noteFrequency(60);
+                    const float rootFrequency =
+                        noteFrequency(settings.sampleRoot);
                     const double pitchRatio =
                         rootFrequency > 0.0f
                             ? (double) currentFreq

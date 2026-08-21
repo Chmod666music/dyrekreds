@@ -151,6 +151,38 @@ juce::AudioProcessorValueTreeState::ParameterLayout createGaldrParameterLayout()
             return String(value, 1) + " /s";
         });
 
+    const auto midiNote = AudioParameterIntAttributes()
+        .withStringFromValueFunction([](int value, int)
+        {
+            return MidiMessage::getMidiNoteName(value, true, true, 4);
+        })
+        .withValueFromStringFunction([](const String& text)
+        {
+            const auto value = text.trim().toUpperCase();
+
+            if (value.containsOnly("0123456789+-"))
+                return jlimit(0, 127, value.getIntValue());
+
+            const StringArray noteNames {
+                "C", "C#", "D", "D#", "E", "F",
+                "F#", "G", "G#", "A", "A#", "B"
+            };
+
+            const int nameLength =
+                value.length() > 1 && value[1] == '#' ? 2 : 1;
+
+            const int semitone =
+                noteNames.indexOf(value.substring(0, nameLength));
+
+            if (semitone < 0)
+                return 60;
+
+            const int octave =
+                value.substring(nameLength).getIntValue();
+
+            return jlimit(0, 127, (octave + 1) * 12 + semitone);
+        });
+
     const StringArray waveNames { "Saw", "Square", "Pulse", "Triangle", "Sine", "Wavetable" };
     const StringArray lfoShapes { "Sine", "Triangle", "Saw", "Square", "S&H" };
     const StringArray syncNames { "Free", "2/1", "1/1", "1/2", "1/4", "1/8", "1/8T", "1/16", "1/16T", "1/32" };
@@ -177,7 +209,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout createGaldrParameterLayout()
 
     // OSC 2
     add(std::make_unique<AudioParameterChoice>(ParameterID { pid::osc2Wave, 1 }, "Osc 2 Wave", waveNames, 0));
-    add(std::make_unique<AudioParameterInt>(ParameterID { pid::osc2Oct, 1 }, "Osc 2 Octave", -2, 2, 0));
+        add(std::make_unique<AudioParameterInt>(ParameterID {  pid::osc2Oct, 1 }, "Osc 2 Octave", -2, 2, 0));
     add(std::make_unique<AudioParameterInt>(ParameterID { pid::osc2Semi, 1 }, "Osc 2 Semi", -12, 12, 0));
     add(std::make_unique<AudioParameterInt>(ParameterID { pid::osc2Uni, 1 }, "Osc 2 Unison", 1, 7, 1));
     add(std::make_unique<AudioParameterFloat>(ParameterID { pid::osc2Det, 1 }, "Osc 2 Detune",
@@ -198,7 +230,24 @@ juce::AudioProcessorValueTreeState::ParameterLayout createGaldrParameterLayout()
         StringArray { "White", "Pink" }, 0));
     add(std::make_unique<AudioParameterFloat>(ParameterID { pid::noiseLvl, 1 }, "Noise Level", zeroOne, 0.0f, percent));
 
+    // ---- sample source
+    add(std::make_unique<AudioParameterFloat>(
+        ParameterID { pid::sampleLvl, 1 },
+        "Sample Level",
+        zeroOne,
+        0.7f,
+        percent));
+
+    add(std::make_unique<AudioParameterInt>(
+        ParameterID { pid::sampleRoot, 1 },
+        "Sample Root Note",
+        0,
+        127,
+        60,
+        midiNote));
+
     // FILTER
+
     add(std::make_unique<AudioParameterChoice>(ParameterID { pid::filterType, 1 }, "Filter Type",
         StringArray { "LP 24", "LP 12", "HP", "BP", "Formant" }, 0));
     add(std::make_unique<AudioParameterFloat>(ParameterID { pid::vowel, 1 }, "Vowel", zeroOne, 0.0f, percent));
@@ -424,6 +473,9 @@ void GaldrAudioProcessor::updateSettings(int numSamples)
     settings.subLvl    = raw(pid::subLvl);
     settings.noiseType = (int) raw(pid::noiseType);
     settings.noiseLvl  = raw(pid::noiseLvl);
+
+    settings.sampleLvl  = raw(pid::sampleLvl);
+    settings.sampleRoot = (int) raw(pid::sampleRoot);
 
     settings.filterType  = (int) raw(pid::filterType);
     settings.cutoff      = raw(pid::cutoff);

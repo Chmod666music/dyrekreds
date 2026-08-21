@@ -93,17 +93,20 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
         addKnob(r2, pid::osc2Lvl, "Level");
     }
     {
-        auto& s = addSection("Sub & Noise", { 588, 80, 220, 238 });
+        auto& s = addSection("Sources", { 588, 80, 280, 238 });
         auto& c1 = comboRow(s);
         addCombo(c1, pid::subWave);
         addCombo(c1, pid::subOct);
         addCombo(comboRow(s), pid::noiseType);
+
         auto& r = knobRow(s);
         addKnob(r, pid::subLvl, "Sub");
         addKnob(r, pid::noiseLvl, "Noise");
+        addKnob(r, pid::sampleLvl, "Sample");
+        addKnob(r, pid::sampleRoot, "Root");
     }
     {
-        auto& s = addSection("Filter", { 816, 80, 392, 238 });
+        auto& s = addSection("Filter", { 876, 80, 332, 238 });
         addCombo(comboRow(s), pid::filterType);
         auto& r = knobRow(s);
         addKnob(r, pid::cutoff, "Cutoff");
@@ -332,14 +335,18 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
             });
     };
     addAndMakeVisible(tuningButton);
-               // ---- sample source
+    // ---- sample source
     const auto updateSampleButton = [this]
     {
         const auto name = processorRef.getSampleName();
         const bool hasSample = name.isNotEmpty();
 
-        sampleButton.setButtonText(hasSample ? "Sample \xE2\x80\xA2"
-                                             : "Sample");
+        const auto loadedMarker =
+            juce::String("Sample ")
+            + juce::String::charToString(0x2022);
+
+        sampleButton.setButtonText(hasSample ? loadedMarker
+                                             : juce::String("Sample"));
 
         sampleButton.setTooltip(
             hasSample ? "Loaded sample: " + name
