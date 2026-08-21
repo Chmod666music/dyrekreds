@@ -98,6 +98,43 @@ public:
         g.drawRect(r, 1);
     }
 
+    void drawLinearSlider(juce::Graphics& g, int x, int y, int width, int height,
+                      float sliderPos, float minSliderPos, float maxSliderPos,
+                      juce::Slider::SliderStyle style, juce::Slider& slider) override
+{
+    if (style != juce::Slider::LinearHorizontal)
+    {
+        juce::LookAndFeel_V4::drawLinearSlider(
+            g, x, y, width, height, sliderPos,
+            minSliderPos, maxSliderPos, style, slider);
+        return;
+    }
+
+    const float startX = (float) x + 5.0f * uiScale;
+    const float endX = (float) (x + width) - 5.0f * uiScale;
+    const float centreY = (float) y + (float) height * 0.5f;
+    const float valueX = juce::jlimit(startX, endX, sliderPos);
+
+    // Recessed stone track.
+    g.setColour(juce::Colour(0xff28343c));
+    g.drawLine(startX, centreY, endX, centreY, 4.0f * uiScale);
+
+    // Warm orbital value trail.
+    g.setColour(theme::blood.withAlpha(0.28f));
+    g.drawLine(startX, centreY, valueX, centreY, 7.0f * uiScale);
+    g.setColour(theme::bloodBright.withAlpha(0.9f));
+    g.drawLine(startX, centreY, valueX, centreY, 2.0f * uiScale);
+
+    // Ivory celestial node.
+    const float nodeRadius = 5.0f * uiScale;
+    g.setColour(theme::bone);
+    g.fillEllipse(valueX - nodeRadius, centreY - nodeRadius,
+                  nodeRadius * 2.0f, nodeRadius * 2.0f);
+    g.setColour(theme::bloodBright.withAlpha(0.75f));
+    g.drawEllipse(valueX - nodeRadius, centreY - nodeRadius,
+                  nodeRadius * 2.0f, nodeRadius * 2.0f,
+                  1.0f * uiScale);
+}
     void drawRotarySlider(juce::Graphics& g, int x, int y, int width, int height,
                           float sliderPos, float rotaryStartAngle, float rotaryEndAngle,
                           juce::Slider&) override
