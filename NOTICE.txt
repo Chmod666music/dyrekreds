@@ -1,17 +1,29 @@
-Galdr — third-party notices for binary distributions
-=====================================================
+Dyrekreds — copyright and third-party notices
+================================================
 
-Galdr is free software: you can redistribute it and/or modify it under the
-terms of the GNU General Public License as published by the Free Software
-Foundation, either version 3 of the License, or (at your option) any later
-version. See LICENSE.txt in this archive.
+Dyrekreds is a modified version of Galdr, originally created by
+Andrea De Murtas.
 
+Galdr:
 Copyright (C) 2026 Andrea De Murtas
+Original source: https://github.com/andreademurtas/galdr
 
-Complete corresponding source code:
-    https://github.com/andreademurtas/galdr
-(each release on that page includes a source archive for the exact version
-of these binaries).
+Dyrekreds:
+Copyright (C) 2026 Jon Skarin
+Modifications begun: 2026-08-21
+Development source: https://github.com/Chmod666music/galdr
+
+Galdr and Dyrekreds are free software: you can redistribute and/or modify
+the covered source code under the terms of the GNU General Public License
+as published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+Dyrekreds includes modifications to Galdr. Modified files and release
+history are recorded in the Git repository. Binary releases must be
+accompanied by, or provide access to, the complete corresponding source
+code for the exact released version.
+
+See LICENSE in the source repository and LICENSE.txt in binary archives.
 
 These binaries also contain the following third-party software:
 
