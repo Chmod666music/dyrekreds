@@ -151,10 +151,13 @@ public:
     g.setGradientFill(stoneButton);
     g.fillRoundedRectangle(bounds, corner);
 
-    g.setColour(button.getToggleState()
-                    ? theme::bloodBright.withAlpha(0.82f)
+        const bool focused = button.hasKeyboardFocus(true);
+
+    g.setColour(button.getToggleState() || focused
+                    ? theme::bloodBright.withAlpha(focused ? 0.94f : 0.82f)
                     : theme::outline.withAlpha(highlighted ? 0.92f : 0.68f));
-    g.drawRoundedRectangle(bounds, corner, 1.0f * uiScale);
+    g.drawRoundedRectangle(bounds, corner,
+                           (focused ? 1.5f : 1.0f) * uiScale);
 
     g.setColour(theme::bone.withAlpha(highlighted ? 0.18f : 0.08f));
     g.drawLine(bounds.getX() + 3.0f * uiScale,

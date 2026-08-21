@@ -337,8 +337,10 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
     keyboard.setColour(juce::MidiKeyboardComponent::whiteNoteColourId, juce::Colour(0xffc9c1b1));
     keyboard.setColour(juce::MidiKeyboardComponent::blackNoteColourId, juce::Colour(0xff111a20));
     keyboard.setColour(juce::MidiKeyboardComponent::keySeparatorLineColourId, juce::Colour(0xff4a4337));
-    keyboard.setColour(juce::MidiKeyboardComponent::mouseOverKeyOverlayColourId, theme::blood.withAlpha(0.4f));
-    keyboard.setColour(juce::MidiKeyboardComponent::keyDownOverlayColourId, theme::bloodBright.withAlpha(0.7f));
+    keyboard.setColour(juce::MidiKeyboardComponent::mouseOverKeyOverlayColourId,
+                       theme::blood.withAlpha(0.22f));
+    keyboard.setColour(juce::MidiKeyboardComponent::keyDownOverlayColourId,
+                       theme::bloodBright.withAlpha(0.84f));
     keyboard.setColour(juce::MidiKeyboardComponent::textLabelColourId, theme::boneDim);
     keyboard.setColour(juce::MidiKeyboardComponent::shadowColourId, juce::Colours::transparentBlack);
     keyboard.setLowestVisibleKey(36);
