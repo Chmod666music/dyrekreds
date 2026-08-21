@@ -200,6 +200,31 @@ void testSampleLoading()
               "sample name is exposed");
     }
 
+        neutralise(processor);
+    setParam(processor, pid::osc1Lvl, 0.0f);
+    setParam(processor, pid::osc2Lvl, 0.0f);
+    setParam(processor, pid::subLvl, 0.0f);
+    setParam(processor, pid::noiseLvl, 0.0f);
+    setParam(processor, pid::attack, 0.001f);
+    setParam(processor, pid::decay, 0.001f);
+    setParam(processor, pid::sustain, 1.0f);
+    setParam(processor, pid::release, 0.01f);
+    setParam(processor, pid::filterDrive, 0.0f);
+    setParam(processor, pid::gain, 1.0f);
+
+    processor.prepareToPlay(sampleRate, 128);
+
+    const std::vector<Event> sampleEvents {
+        { 0,          juce::MidiMessage::noteOn(1, 60, 1.0f) },
+        { numSamples, juce::MidiMessage::noteOff(1, 60) }
+    };
+
+    const auto sampleRender =
+        render(processor, sampleRate, 128, 0.12, sampleEvents);
+
+    check(peakIn(sampleRender, sampleRate, 0.005, 0.09) > 0.01f,
+          "loaded sample renders from MIDI with oscillators muted");
+
     const auto sampleBeforeFailure = processor.currentSample();
 
     const auto failed = processor.loadSample(

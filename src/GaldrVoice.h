@@ -7,6 +7,7 @@
 #include <juce_dsp/juce_dsp.h>
 #include <atomic>
 #include "GaldrDSP.h"
+#include "SampleData.h"
 
 struct SynthSound : public juce::SynthesiserSound
 {
@@ -48,6 +49,9 @@ public:
 
         const float* noteFreqs = nullptr;  // 128-entry tuning table (nullptr = 12-TET)
         float bendRangeSemis = 2.0f;
+
+        // Published atomically by the processor and acquired when a note starts.
+        const std::shared_ptr<const dyrekreds::SampleData>* sampleSource = nullptr;
 
         int   filterType = 0;
         float cutoff = 12000.0f, resonance = 0.2f, filterDrive = 0.0f;
@@ -100,9 +104,17 @@ public:
         targetFreq = noteFrequency(midiNote);
     }
 
-    void startNote(int midiNote, float velocity, juce::SynthesiserSound*, int) override
+    void startNote(int midiNote, float velocity,
+                   juce::SynthesiserSound*, int) override
     {
         note = midiNote;
+
+        voiceSample = settings.sampleSource != nullptr
+            ? std::atomic_load_explicit(settings.sampleSource,
+                                        std::memory_order_acquire)
+            : nullptr;
+        samplePosition = 0.0;
+
         velocity01 = velocity;
         level = 0.1f + velocity * 0.15f;
         pressure = 0.0f;
@@ -267,6 +279,55 @@ public:
                 w *= effNoise * 0.7f;
                 l += w;
                 r += w;
+            }
+
+                if (voiceSample != nullptr && voiceSample->isValid())
+            {
+                const int sampleCount =
+                    voiceSample->audio.getNumSamples();
+
+                if (samplePosition < (double) sampleCount)
+                {
+                    const int index0 = (int) samplePosition;
+                    const int index1 =
+                        juce::jmin(index0 + 1, sampleCount - 1);
+                    const float fraction =
+                        (float) (samplePosition - (double) index0);
+
+                    const auto readInterpolated =
+                        [this, index0, index1, fraction](int channel)
+                        {
+                            const float a =
+                                voiceSample->audio.getSample(channel, index0);
+                            const float b =
+                                voiceSample->audio.getSample(channel, index1);
+
+                            return a + fraction * (b - a);
+                        };
+
+                    const int rightChannel =
+                        juce::jmin(1,
+                            voiceSample->audio.getNumChannels() - 1);
+
+                    constexpr float sampleGain = 0.7f;
+                    l += readInterpolated(0) * sampleGain;
+                    r += readInterpolated(rightChannel) * sampleGain;
+
+                    const float rootFrequency = noteFrequency(60);
+                    const double pitchRatio =
+                        rootFrequency > 0.0f
+                            ? (double) currentFreq
+                                / (double) rootFrequency
+                            : 1.0;
+
+                    const double sourceRateRatio =
+                        voiceSample->sampleRate / (double) sr;
+
+                    samplePosition +=
+                        sourceRateRatio
+                        * pitchRatio
+                        * (double) pitchMods;
+                }
             }
 
             l = std::tanh(l * driveGain);
@@ -453,6 +514,9 @@ private:
     juce::ADSR ampAdsr, filtAdsr, env3Adsr;
     juce::dsp::StateVariableTPTFilter<float> filter1, filter2, filter3;
     juce::AudioBuffer<float> voiceBuffer;
+
+    std::shared_ptr<const dyrekreds::SampleData> voiceSample;
+    double samplePosition = 0.0;
 
     int note = 60;
     float level = 0.0f, velocity01 = 0.0f, random01 = 0.0f;

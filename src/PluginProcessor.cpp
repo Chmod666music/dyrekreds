@@ -31,6 +31,7 @@ GaldrAudioProcessor::GaldrAudioProcessor()
 {
     settings.noteFreqs = tuning.freqs;
     settings.noteCounter = &noteSerial;
+    settings.sampleSource = &sampleData;
 
     for (int i = 0; i < numVoices; ++i)
         synth.addVoice(new GaldrVoice(settings));
