@@ -605,17 +605,19 @@ void GaldrAudioProcessorEditor::paint(juce::Graphics& g)
 
     // header
     auto sc = [scale](int v) { return juce::roundToInt((float) v * scale); };
-    auto titleArea = juce::Rectangle<int>(sc(20), sc(8), sc(260), sc(46));
-    g.setFont(lnf.getTitleFont(42.0f * scale));
-    g.setColour(theme::blood.withAlpha(0.6f));
-    g.drawText("Dyrekreds", titleArea.translated(0, sc(2)), juce::Justification::centredLeft);
+    auto titleArea = juce::Rectangle<int>(sc(20), sc(8), sc(430), sc(40));
+    g.setFont(lnf.getTitleFont(30.0f * scale));
+    g.setColour(theme::blood.withAlpha(0.45f));
+    g.drawText("D Y R E K R E D S", titleArea.translated(0, sc(1)),
+           juce::Justification::centredLeft);
     g.setColour(theme::bone);
-    g.drawText("Dyrekreds", titleArea, juce::Justification::centredLeft);
+    g.drawText("D Y R E K R E D S", titleArea,
+           juce::Justification::centredLeft);
 
-    g.setFont(lnf.getBodyFont(14.0f * scale));
+    g.setFont(lnf.getBodyFont(12.0f * scale));
     g.setColour(theme::boneDim);
-    g.drawText("an astronomical stone instrument", sc(22), sc(52), sc(400), sc(15),
-               juce::Justification::centredLeft);
+    g.drawText("F U I M A D A N E", sc(22), sc(47), sc(300), sc(15),
+           juce::Justification::centredLeft);
 
     // section panels
     for (const auto& s : sections)

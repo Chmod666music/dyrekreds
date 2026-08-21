@@ -23,7 +23,7 @@ class BlackMetalLookAndFeel : public juce::LookAndFeel_V4
 public:
     BlackMetalLookAndFeel()
         : titleTypeface(juce::Typeface::createSystemTypefaceFor(
-              BinaryData::UnifrakturMaguntia_ttf, BinaryData::UnifrakturMaguntia_ttfSize)),
+              BinaryData::IMFellEnglish_ttf, BinaryData::IMFellEnglish_ttfSize)),
           bodyTypeface(juce::Typeface::createSystemTypefaceFor(
               BinaryData::IMFellEnglish_ttf, BinaryData::IMFellEnglish_ttfSize))
     {
