@@ -296,10 +296,17 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
     tuningButton.setTooltip("Microtuning: load a Scala .scl file");
     tuningButton.onClick = [this]
     {
-        juce::PopupMenu menu;
+                juce::PopupMenu menu;
         menu.setLookAndFeel(&lnf);
-        menu.addItem(1, "Load Scala tuning (.scl)...");
-        menu.addItem(2, "Reset to 12-TET");
+
+        menu.addSectionHeader("CELESTIAL TUNING");
+        menu.addItem(3,
+                     "Active: " + processorRef.getTuningName(),
+                     false,
+                     false);
+        menu.addSeparator();
+        menu.addItem(1, "Load Scala scale (.scl)...");
+        menu.addItem(2, "Return to 12-TET");
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(tuningButton),
             [this](int result)
             {

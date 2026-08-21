@@ -51,6 +51,7 @@ public:
         setColour(juce::PopupMenu::textColourId, theme::bone);
         setColour(juce::PopupMenu::highlightedBackgroundColourId, theme::blood.withAlpha(0.4f));
         setColour(juce::PopupMenu::highlightedTextColourId, juce::Colours::white);
+        setColour(juce::PopupMenu::headerTextColourId, theme::bloodBright);
         setColour(juce::TextEditor::textColourId, theme::bone);
         setColour(juce::TextEditor::highlightColourId, theme::blood.withAlpha(0.4f));
         setColour(juce::CaretComponent::caretColourId, theme::bloodBright);
