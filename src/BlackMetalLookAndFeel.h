@@ -79,24 +79,41 @@ public:
         return getBodyFont(15.0f * uiScale);
     }
 
-    void drawButtonBackground(juce::Graphics& g, juce::Button& button, const juce::Colour&,
-                              bool highlighted, bool down) override
-    {
-        auto r = button.getLocalBounds();
+    void drawButtonBackground(juce::Graphics& g, juce::Button& button,
+                          const juce::Colour&, bool highlighted, bool down) override
+{
+    auto bounds = button.getLocalBounds().toFloat().reduced(0.5f);
+    const float corner = 2.5f * uiScale;
 
-        // Toggles wear their state: without this, an engaged toggle is pixel
-        // identical to a disengaged one and the button reads as a label.
-        // (Found in Gjalla, whose pedal and gate switches were invisible.)
-        const auto resting = button.getToggleState()
-                                 ? button.findColour(juce::TextButton::buttonOnColourId)
-                                 : theme::iron;
+    const auto resting = button.getToggleState()
+                           ? button.findColour(juce::TextButton::buttonOnColourId)
+                           : theme::iron;
 
-        g.setColour(down ? theme::blood.withAlpha(0.5f)
-                         : highlighted ? resting.brighter(0.3f) : resting);
-        g.fillRect(r);
-        g.setColour(button.getToggleState() ? theme::bloodBright.withAlpha(0.7f) : theme::outline);
-        g.drawRect(r, 1);
-    }
+    auto top = resting.brighter(highlighted ? 0.24f : 0.10f);
+    auto bottom = resting.darker(down ? 0.02f : 0.16f);
+
+    if (down)
+        top = theme::blood.withAlpha(0.58f);
+
+    juce::ColourGradient stoneButton(
+        top, bounds.getX(), bounds.getY(),
+        bottom, bounds.getX(), bounds.getBottom(), false);
+
+    g.setGradientFill(stoneButton);
+    g.fillRoundedRectangle(bounds, corner);
+
+    g.setColour(button.getToggleState()
+                    ? theme::bloodBright.withAlpha(0.82f)
+                    : theme::outline.withAlpha(highlighted ? 0.92f : 0.68f));
+    g.drawRoundedRectangle(bounds, corner, 1.0f * uiScale);
+
+    g.setColour(theme::bone.withAlpha(highlighted ? 0.18f : 0.08f));
+    g.drawLine(bounds.getX() + 3.0f * uiScale,
+               bounds.getY() + 1.5f * uiScale,
+               bounds.getRight() - 3.0f * uiScale,
+               bounds.getY() + 1.5f * uiScale,
+               1.0f * uiScale);
+}
 
     void drawLinearSlider(juce::Graphics& g, int x, int y, int width, int height,
                       float sliderPos, float minSliderPos, float maxSliderPos,
@@ -190,22 +207,42 @@ public:
     }
 
     void drawComboBox(juce::Graphics& g, int width, int height, bool,
-                      int, int, int, int, juce::ComboBox& box) override
-    {
-        juce::Rectangle<int> b(0, 0, width, height);
-        g.setColour(theme::iron);
-        g.fillRect(b);
-        g.setColour(box.hasKeyboardFocus(true) ? theme::blood : theme::outline);
-        g.drawRect(b, 1);
+                  int, int, int, int, juce::ComboBox& box) override
+{
+    juce::Rectangle<int> bounds(0, 0, width, height);
+    auto face = bounds.toFloat().reduced(0.5f);
+    const float corner = 2.0f * uiScale;
 
-        auto arrowZone = b.removeFromRight(26).toFloat();
-        juce::Path arrow;
-        arrow.addTriangle(arrowZone.getCentreX() - 5.0f, arrowZone.getCentreY() - 2.5f,
-                          arrowZone.getCentreX() + 5.0f, arrowZone.getCentreY() - 2.5f,
-                          arrowZone.getCentreX(),        arrowZone.getCentreY() + 4.5f);
-        g.setColour(findColour(juce::ComboBox::arrowColourId));
-        g.fillPath(arrow);
-    }
+    juce::ColourGradient stoneBox(
+        theme::iron.brighter(0.10f),
+        face.getX(), face.getY(),
+        theme::iron.darker(0.16f),
+        face.getX(), face.getBottom(), false);
+
+    g.setGradientFill(stoneBox);
+    g.fillRoundedRectangle(face, corner);
+
+    g.setColour(box.hasKeyboardFocus(true)
+                    ? theme::bloodBright.withAlpha(0.82f)
+                    : theme::outline.withAlpha(0.72f));
+    g.drawRoundedRectangle(face, corner, 1.0f * uiScale);
+
+    g.setColour(theme::bone.withAlpha(0.07f));
+    g.drawLine(face.getX() + 3.0f * uiScale,
+               face.getY() + 1.5f * uiScale,
+               face.getRight() - 3.0f * uiScale,
+               face.getY() + 1.5f * uiScale,
+               1.0f * uiScale);
+
+    auto arrowZone = bounds.removeFromRight(26).toFloat();
+    juce::Path arrow;
+    arrow.addTriangle(arrowZone.getCentreX() - 5.0f, arrowZone.getCentreY() - 2.5f,
+                      arrowZone.getCentreX() + 5.0f, arrowZone.getCentreY() - 2.5f,
+                      arrowZone.getCentreX(), arrowZone.getCentreY() + 4.5f);
+
+    g.setColour(findColour(juce::ComboBox::arrowColourId));
+    g.fillPath(arrow);
+}
 
 private:
     juce::Typeface::Ptr titleTypeface, bodyTypeface;
