@@ -83,7 +83,7 @@ private:
     void paint(juce::Graphics& g) override
     {
         auto b = getLocalBounds().toFloat().reduced(1.0f);
-        g.setColour(juce::Colour(0xcc08080b));
+        g.setColour(juce::Colour(0xe60a1218));
         g.fillRect(b);
         g.setColour(theme::outline.withAlpha(0.6f));
         g.drawRect(b, 1.0f);
@@ -173,7 +173,7 @@ private:
     void paint(juce::Graphics& g) override
     {
         auto b = getLocalBounds().toFloat().reduced(1.0f);
-        g.setColour(juce::Colour(0xcc08080b));
+        g.setColour(juce::Colour(0xe60a1218));
         g.fillRect(b);
         g.setColour(theme::outline.withAlpha(0.6f));
         g.drawRect(b, 1.0f);

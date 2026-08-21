@@ -327,9 +327,9 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
     addAndMakeVisible(tuningButton);
 
     // ---- keyboard
-    keyboard.setColour(juce::MidiKeyboardComponent::whiteNoteColourId, juce::Colour(0xff2a2a30));
-    keyboard.setColour(juce::MidiKeyboardComponent::blackNoteColourId, juce::Colour(0xff0c0c0e));
-    keyboard.setColour(juce::MidiKeyboardComponent::keySeparatorLineColourId, juce::Colour(0xff1a1a1e));
+    keyboard.setColour(juce::MidiKeyboardComponent::whiteNoteColourId, juce::Colour(0xffc9c1b1));
+    keyboard.setColour(juce::MidiKeyboardComponent::blackNoteColourId, juce::Colour(0xff111a20));
+    keyboard.setColour(juce::MidiKeyboardComponent::keySeparatorLineColourId, juce::Colour(0xff4a4337));
     keyboard.setColour(juce::MidiKeyboardComponent::mouseOverKeyOverlayColourId, theme::blood.withAlpha(0.4f));
     keyboard.setColour(juce::MidiKeyboardComponent::keyDownOverlayColourId, theme::bloodBright.withAlpha(0.7f));
     keyboard.setColour(juce::MidiKeyboardComponent::textLabelColourId, theme::boneDim);
@@ -590,13 +590,13 @@ void GaldrAudioProcessorEditor::paint(juce::Graphics& g)
     const auto h = (float) getHeight();
     const float scale = w / (float) baseW;
 
-    juce::ColourGradient sky(juce::Colour(0xff111116), 0.0f, 0.0f,
-                             juce::Colour(0xff07070a), 0.0f, h, false);
+    juce::ColourGradient sky(juce::Colour(0xff182832), 0.0f, 0.0f,
+                         juce::Colour(0xff080d12), 0.0f, h, false);
     g.setGradientFill(sky);
     g.fillAll();
 
-    drawRidge(g, 0.72f, 0.20f, 3, juce::Colour(0xff0e0e12));
-    drawRidge(g, 0.86f, 0.14f, 5, juce::Colour(0xff121218));
+    drawRidge(g, 0.72f, 0.20f, 3, juce::Colour(0xff101a21));
+    drawRidge(g, 0.86f, 0.14f, 5, juce::Colour(0xff17242b));
 
     juce::ColourGradient vignette(juce::Colours::transparentBlack, w * 0.5f, h * 0.45f,
                                   juce::Colour(0xaa000000), 0.0f, 0.0f, true);
@@ -614,7 +614,7 @@ void GaldrAudioProcessorEditor::paint(juce::Graphics& g)
 
     g.setFont(lnf.getBodyFont(14.0f * scale));
     g.setColour(theme::boneDim);
-    g.drawText("a grim & frostbitten polysynth", sc(22), sc(52), sc(400), sc(15),
+    g.drawText("an astronomical stone instrument", sc(22), sc(52), sc(400), sc(15),
                juce::Justification::centredLeft);
 
     // section panels
