@@ -52,6 +52,46 @@ GaldrAudioProcessor::~GaldrAudioProcessor()
             apvts.removeParameterListener(rp->paramID, this);
 }
 
+dyrekreds::SampleLoadResult
+GaldrAudioProcessor::loadSample(const juce::File& file)
+{
+    auto result = dyrekreds::SampleLoader::load(file);
+
+    if (result)
+    {
+        std::atomic_store_explicit(&sampleData,
+                                   result.sample,
+                                   std::memory_order_release);
+        presetDirty.store(true);
+    }
+
+    return result;
+}
+
+void GaldrAudioProcessor::clearSample()
+{
+    std::shared_ptr<const dyrekreds::SampleData> empty;
+    std::atomic_store_explicit(&sampleData,
+                               std::move(empty),
+                               std::memory_order_release);
+    presetDirty.store(true);
+}
+
+std::shared_ptr<const dyrekreds::SampleData>
+GaldrAudioProcessor::currentSample() const
+{
+    return std::atomic_load_explicit(&sampleData,
+                                     std::memory_order_acquire);
+}
+
+juce::String GaldrAudioProcessor::getSampleName() const
+{
+    if (auto sample = currentSample())
+        return sample->name;
+
+    return {};
+}
+
 juce::AudioProcessorValueTreeState::ParameterLayout createGaldrParameterLayout()
 {
     using namespace juce;

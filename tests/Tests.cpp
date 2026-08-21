@@ -126,7 +126,98 @@ bool allFinite(const std::vector<float>& v, float& worst)
     }
     return ok;
 }
+void testSampleLoading()
+{
+    std::cout << "sample loading" << std::endl;
 
+    constexpr double sampleRate = 48000.0;
+    constexpr int numSamples = 4800;
+
+    auto file = juce::File::getSpecialLocation(juce::File::tempDirectory)
+                    .getNonexistentChildFile(
+                        "dyrekreds-sample-loader", ".wav", false);
+
+    juce::AudioBuffer<float> source(1, numSamples);
+
+    for (int i = 0; i < numSamples; ++i)
+    {
+        const auto phase =
+            juce::MathConstants<double>::twoPi
+            * 220.0
+            * (double) i
+            / sampleRate;
+
+        source.setSample(0, i, 0.5f * (float) std::sin(phase));
+    }
+
+    juce::WavAudioFormat wavFormat;
+
+    std::unique_ptr<juce::AudioFormatWriter> writer(
+        wavFormat.createWriterFor(
+            new juce::FileOutputStream(file),
+            sampleRate,
+            1,
+            16,
+            {},
+            0));
+
+    check(writer != nullptr, "temporary WAV writer opens");
+
+    if (writer == nullptr)
+    {
+        file.deleteFile();
+        return;
+    }
+
+    check(writer->writeFromAudioSampleBuffer(
+              source, 0, numSamples),
+          "temporary WAV is written");
+
+    writer.reset();
+
+    GaldrAudioProcessor processor;
+
+    const auto loaded = processor.loadSample(file);
+
+    check((bool) loaded, "WAV sample loads");
+
+    if (loaded)
+    {
+        check(loaded.sample->isValid(),
+              "loaded sample is valid");
+
+        check(loaded.sample->audio.getNumChannels() == 1,
+              "mono channel count survives");
+
+        check(loaded.sample->audio.getNumSamples() == numSamples,
+              "sample length survives");
+
+        check(std::abs(loaded.sample->sampleRate - sampleRate) < 0.01,
+              "sample rate survives");
+
+        check(processor.getSampleName()
+                  == file.getFileNameWithoutExtension(),
+              "sample name is exposed");
+    }
+
+    const auto sampleBeforeFailure = processor.currentSample();
+
+    const auto failed = processor.loadSample(
+        file.getSiblingFile("missing-dyrekreds-sample.wav"));
+
+    check(! failed, "missing sample is rejected");
+
+    check(processor.currentSample() == sampleBeforeFailure,
+          "failed load keeps the current sample");
+
+    processor.clearSample();
+
+    check(processor.currentSample() == nullptr,
+          "sample can be cleared");
+
+    check(file.deleteFile(),
+          "temporary WAV is removed");
+}
 void testStateRoundTrip()
 {
     std::cout << "state round-trip" << std::endl;
@@ -574,6 +665,7 @@ int main()
     juce::ScopedJuceInitialiser_GUI juceInit;
     std::cout << "Dyrekreds headless" << std::endl;
 
+    testSampleLoading();
     testStateRoundTrip();
     testMidiLearn();
     testTuningParser();
