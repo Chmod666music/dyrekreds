@@ -608,9 +608,9 @@ void GaldrAudioProcessorEditor::paint(juce::Graphics& g)
     auto titleArea = juce::Rectangle<int>(sc(20), sc(8), sc(260), sc(46));
     g.setFont(lnf.getTitleFont(42.0f * scale));
     g.setColour(theme::blood.withAlpha(0.6f));
-    g.drawText("Galdr", titleArea.translated(0, sc(2)), juce::Justification::centredLeft);
+    g.drawText("Dyrekreds", titleArea.translated(0, sc(2)), juce::Justification::centredLeft);
     g.setColour(theme::bone);
-    g.drawText("Galdr", titleArea, juce::Justification::centredLeft);
+    g.drawText("Dyrekreds", titleArea, juce::Justification::centredLeft);
 
     g.setFont(lnf.getBodyFont(14.0f * scale));
     g.setColour(theme::boneDim);

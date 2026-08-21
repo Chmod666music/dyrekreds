@@ -65,7 +65,7 @@ public:
     static juce::File presetDirectory()
     {
         auto dir = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
-                       .getChildFile("Galdr Presets");
+                       .getChildFile("Dyrekreds Presets");
         dir.createDirectory();
         return dir;
     }

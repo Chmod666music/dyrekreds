@@ -572,7 +572,7 @@ void testFiniteness()
 int main()
 {
     juce::ScopedJuceInitialiser_GUI juceInit;
-    std::cout << "Galdr headless tests" << std::endl;
+    std::cout << "Dyrekreds headless" << std::endl;
 
     testStateRoundTrip();
     testMidiLearn();
