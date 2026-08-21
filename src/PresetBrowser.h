@@ -51,6 +51,25 @@ public:
         }
         descEdit.setMultiLine(true, true);
         descEdit.setReturnKeyStartsNewLine(true);
+
+        // Search and save fields share the instrument's carved-stone styling.
+        for (auto* e : { &searchBox, &nameEdit, &authorEdit, &descEdit })
+        {
+            e->setColour(juce::TextEditor::backgroundColourId,
+                         theme::background.brighter(0.035f));
+            e->setColour(juce::TextEditor::textColourId, theme::bone);
+            e->setColour(juce::TextEditor::outlineColourId,
+                         theme::outline.withAlpha(0.90f));
+            e->setColour(juce::TextEditor::focusedOutlineColourId,
+                         theme::bloodBright.withAlpha(0.90f));
+            e->setColour(juce::TextEditor::highlightColourId,
+                         theme::blood.withAlpha(0.55f));
+            e->setColour(juce::TextEditor::highlightedTextColourId,
+                         theme::bone);
+            e->setColour(juce::TextEditor::shadowColourId,
+                         juce::Colours::transparentBlack);
+        }
+
         for (auto* e : { &nameEdit, &authorEdit, &descEdit })
             addChildComponent(e);
 
@@ -131,7 +150,8 @@ public:
         saveToggle.setBounds(rowOf(28));
 
         // save form fills the same column
-        auto form = detailArea;
+        auto form = detailArea.reduced(sc(12), sc(10));
+        form.removeFromTop(sc(34));
         nameLabel.setBounds(form.removeFromTop(sc(18)));
         nameEdit.setBounds(form.removeFromTop(sc(26)));
         form.removeFromTop(sc(8));
@@ -206,8 +226,52 @@ public:
         g.drawText("Presets", box.getX() + sc(16), box.getY() + sc(10), sc(220), sc(34),
                    juce::Justification::centredLeft);
 
-        if (! saveMode)
+                if (saveMode)
+        {
+            // Recessed stone tablet behind the save form.
+            auto formPanel = detailArea.toFloat();
+
+            juce::ColourGradient formStone(
+                theme::panel.brighter(0.08f),
+                formPanel.getX(), formPanel.getY(),
+                theme::background.brighter(0.025f),
+                formPanel.getX(), formPanel.getBottom(),
+                false);
+
+            g.setGradientFill(formStone);
+            g.fillRoundedRectangle(formPanel, (float) sc(2));
+
+            g.setColour(theme::outline.withAlpha(0.90f));
+            g.drawRoundedRectangle(formPanel.reduced(0.5f),
+                                   (float) sc(2), 1.0f);
+
+                        g.setColour(theme::bone);
+            g.setFont(lnf.getBodyFont(18.0f * scale));
+            g.drawText("SAVE CURRENT SOUND",
+                       detailArea.getX() + sc(14),
+                       detailArea.getY() + sc(8),
+                       detailArea.getWidth() - sc(28),
+                       sc(22),
+                       juce::Justification::centredLeft);
+
+            g.setColour(theme::blood.withAlpha(0.42f));
+            g.drawHorizontalLine(detailArea.getY() + sc(34),
+                                 (float) (detailArea.getX() + sc(12)),
+                                 (float) (detailArea.getRight() - sc(12)));
+
+            // A slim amber inscription line marks the editable tablet.
+            g.setColour(theme::bloodBright.withAlpha(0.48f));
+            g.fillRoundedRectangle(
+                formPanel.getX() + (float) sc(3),
+                formPanel.getY() + (float) sc(8),
+                (float) sc(2),
+                formPanel.getHeight() - (float) sc(16),
+                1.0f);
+        }
+        else
+        {
             paintDetails(g, scale);
+        }
     }
 
     void mouseDown(const juce::MouseEvent& e) override
