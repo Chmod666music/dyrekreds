@@ -636,7 +636,7 @@ void GaldrAudioProcessorEditor::paint(juce::Graphics& g)
            juce::Justification::centredLeft);
 
     g.setFont(lnf.getBodyFont(12.0f * scale));
-    g.setColour(theme::boneDim);
+    g.setColour(theme::bone.withAlpha(0.62f));
     g.drawText("F U I M A D A N E", sc(22), sc(47), sc(300), sc(15),
            juce::Justification::centredLeft);
     // Dyrekreds celestial seal — a restrained echo of the album artwork.
@@ -715,19 +715,26 @@ juce::ColourGradient stone(
                      (float) b.getX() + sc(2),
                      (float) b.getRight() - sc(2));
 
-        g.setFont(lnf.getBodyFont(15.0f * scale));
-        g.setColour(theme::boneDim);
-        g.drawText(s.title, b.getX() + sc(8), b.getY() + 2, b.getWidth() - sc(16), sc(16),
+                g.setFont(lnf.getBodyFont(15.0f * scale));
+        g.setColour(theme::bone.withAlpha(0.76f));
+        g.drawText(s.title,
+                   b.getX() + sc(8),
+                   b.getY() + 2,
+                   b.getWidth() - sc(16),
+                   sc(16),
                    juce::Justification::centredLeft);
-        g.setColour(theme::blood);
-        g.fillRect((float) b.getX() + 8.0f * scale, (float) b.getY() + 18.0f * scale,
-                   24.0f * scale, 1.5f);
+
+        g.setColour(theme::bloodBright.withAlpha(0.60f));
+        g.fillRect((float) b.getX() + 8.0f * scale,
+                   (float) b.getY() + 18.0f * scale,
+                   24.0f * scale,
+                   1.5f);
     }
 
     // outer frame and corner brackets
     g.setColour(theme::outline);
     g.drawRect(getLocalBounds(), 2);
-    g.setColour(theme::blood);
+    g.setColour(theme::bloodBright.withAlpha(0.60f));
     const float m = 6.0f, len = 16.0f, t = 2.0f;
     g.fillRect(m, m, len, t);                   g.fillRect(m, m, t, len);
     g.fillRect(w - m - len, m, len, t);         g.fillRect(w - m - t, m, t, len);
