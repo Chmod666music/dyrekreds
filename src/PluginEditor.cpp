@@ -347,6 +347,7 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
     // Must come after the children exist: sliders snapshot their text-box
     // colours when notified of a look-and-feel change.
     setLookAndFeel(&lnf);
+    tooltipWindow.setLookAndFeel(&lnf);
 
     setResizable(true, true);
     getConstrainer()->setFixedAspectRatio((double) baseW / (double) baseH);
@@ -357,8 +358,9 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
     startTimerHz(4);
 }
 
-GaldrAudioProcessorEditor::~GaldrAudioProcessorEditor()
+    GaldrAudioProcessorEditor::~GaldrAudioProcessorEditor()
 {
+    tooltipWindow.setLookAndFeel(nullptr);
     setLookAndFeel(nullptr);
 }
 

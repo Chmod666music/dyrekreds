@@ -41,8 +41,10 @@ public:
           theme::iron.withAlpha(0.85f));
         setColour(juce::ScrollBar::thumbColourId,
           theme::bloodBright.withAlpha(0.78f));
-        setColour(juce::BubbleComponent::backgroundColourId, theme::panel);
-        setColour(juce::BubbleComponent::outlineColourId, theme::outline);
+        setColour(juce::BubbleComponent::backgroundColourId,
+            theme::background.brighter(0.055f));
+        setColour(juce::BubbleComponent::outlineColourId,
+            theme::bloodBright.withAlpha(0.72f));
         setColour(juce::ComboBox::backgroundColourId, theme::iron);
         setColour(juce::ComboBox::textColourId, theme::bone);
         setColour(juce::ComboBox::outlineColourId, theme::outline);
@@ -59,9 +61,11 @@ public:
         setColour(juce::TextButton::buttonOnColourId, theme::blood.withAlpha(0.6f));
         setColour(juce::TextButton::textColourOffId, theme::bone);
         setColour(juce::TextButton::textColourOnId, theme::bone);
-        setColour(juce::TooltipWindow::backgroundColourId, theme::panel);
+            setColour(juce::TooltipWindow::backgroundColourId,
+            theme::background.brighter(0.055f));
         setColour(juce::TooltipWindow::textColourId, theme::bone);
-        setColour(juce::TooltipWindow::outlineColourId, theme::outline);
+        setColour(juce::TooltipWindow::outlineColourId,
+            theme::bloodBright.withAlpha(0.68f));
     }
 
     // Set by the editor when the window is rescaled.
@@ -80,6 +84,42 @@ public:
     juce::Font getLabelFont(juce::Label&) override        { return getBodyFont(15.0f * uiScale); }
     juce::Font getComboBoxFont(juce::ComboBox&) override  { return getBodyFont(16.0f * uiScale); }
     juce::Font getPopupMenuFont() override                { return getBodyFont(17.0f * uiScale); }
+    juce::Font getSliderPopupFont(juce::Slider&) override
+    {
+        return getBodyFont(15.0f * uiScale);
+    }
+        void drawTooltip(juce::Graphics& g,
+                     const juce::String& text,
+                     int width,
+                     int height) override
+    {
+        auto bounds = juce::Rectangle<float>(
+            0.0f, 0.0f, (float) width, (float) height).reduced(0.5f);
+
+        juce::ColourGradient stone(
+            theme::panel.brighter(0.10f),
+            0.0f, 0.0f,
+            theme::background.brighter(0.025f),
+            0.0f, (float) height,
+            false);
+
+        g.setGradientFill(stone);
+        g.fillRoundedRectangle(bounds, 2.5f * uiScale);
+
+        g.setColour(theme::bloodBright.withAlpha(0.78f));
+        g.drawRoundedRectangle(bounds,
+                               2.5f * uiScale,
+                               juce::jmax(1.0f, uiScale));
+
+        g.setColour(theme::bone);
+        g.setFont(getBodyFont(13.5f * uiScale));
+        g.drawFittedText(text,
+                         juce::Rectangle<int>(0, 0, width, height)
+                             .reduced(juce::roundToInt(6.0f * uiScale),
+                                      juce::roundToInt(2.0f * uiScale)),
+                         juce::Justification::centred,
+                         2);
+    }
 
     juce::Font getTextButtonFont(juce::TextButton&, int) override
     {
