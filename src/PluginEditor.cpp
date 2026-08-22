@@ -57,7 +57,12 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
       processorRef(p),
       keyboard(p.keyboardState, juce::MidiKeyboardComponent::horizontalKeyboard),
       scope(p.scopeFifo),
-      spectrum(p.spectrumFifo, [&p] { return p.getSampleRate(); })
+    sampleWaveform(
+    [&p] { return p.currentSample(); },
+    [&p] { return p.getGranularPlayhead(); },
+    *p.apvts.getParameter(pid::grainPosition),
+    *p.apvts.getParameter(pid::grainSpread)),
+    spectrum(p.spectrumFifo, [&p] { return p.getSampleRate(); })
 {
     sections.reserve(24);
 
@@ -93,17 +98,23 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
         addKnob(r2, pid::osc2Lvl, "Level");
     }
     {
-        auto& s = addSection("Sub & Noise", { 588, 80, 220, 238 });
+        auto& s = addSection("Sources", { 588, 80, 280, 238 });
         auto& c1 = comboRow(s);
         addCombo(c1, pid::subWave);
         addCombo(c1, pid::subOct);
-        addCombo(comboRow(s), pid::noiseType);
+
+        auto& c2 = comboRow(s);
+        addCombo(c2, pid::noiseType);
+        addCombo(c2, pid::sampleMode);
+
         auto& r = knobRow(s);
         addKnob(r, pid::subLvl, "Sub");
         addKnob(r, pid::noiseLvl, "Noise");
+        addKnob(r, pid::sampleLvl, "Sample");
+        addKnob(r, pid::sampleRoot, "Root");
     }
     {
-        auto& s = addSection("Filter", { 816, 80, 392, 238 });
+        auto& s = addSection("Filter", { 876, 80, 332, 238 });
         addCombo(comboRow(s), pid::filterType);
         auto& r = knobRow(s);
         addKnob(r, pid::cutoff, "Cutoff");
@@ -245,19 +256,35 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
         }
     }
 
-    // ---- row 5: blizzard and visualizers
+    // ---- row 5: blizzard, granular source and visualizers
+{
+    auto& s = addSection("Blizzard", { 12, 780, 300, 148 });
+    addCombo(comboRow(s), pid::bzGate);
+
+    auto& r = knobRow(s);
+    addKnob(r, pid::bzDensity, "Density");
+    addKnob(r, pid::bzSize, "Size");
+    addKnob(r, pid::bzPitch, "Pitch");
+    addKnob(r, pid::bzSpread, "Spread");
+    addKnob(r, pid::bzLvl, "Level");
+}
+{
     {
-        auto& s = addSection("Blizzard", { 12, 780, 340, 148 });
-        addCombo(comboRow(s), pid::bzGate);
-        auto& r = knobRow(s);
-        addKnob(r, pid::bzDensity, "Density");
-        addKnob(r, pid::bzSize, "Size");
-        addKnob(r, pid::bzPitch, "Pitch");
-        addKnob(r, pid::bzSpread, "Spread");
-        addKnob(r, pid::bzLvl, "Level");
-    }
-    addCustomSection("Oscilloscope", { 360, 780, 420, 148 }, scope);
-    addCustomSection("Spectrum", { 788, 780, 420, 148 }, spectrum);
+    auto& s = addSection("Granular", { 320, 780, 300, 148 });
+
+    addCombo(comboRow(s), pid::grainMotion);
+
+    auto& r = knobRow(s);
+    addKnob(r, pid::grainSize, "Size");
+    addKnob(r, pid::grainDensity, "Density");
+    addKnob(r, pid::grainPosition, "Position");
+    addKnob(r, pid::grainSpread, "Spread");
+    addKnob(r, pid::grainStereo, "Stereo");
+}
+}
+
+    addCustomSection("Sample", { 628, 780, 280, 148 }, sampleWaveform);
+    addCustomSection("Spectrum", { 916, 780, 292, 148 }, spectrum);
 
     // ---- preset browser and header controls
     presetBrowser = std::make_unique<PresetBrowser>(processorRef, lnf);
@@ -332,6 +359,93 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
             });
     };
     addAndMakeVisible(tuningButton);
+    // ---- sample source
+    const auto updateSampleButton = [this]
+    {
+        const auto name = processorRef.getSampleName();
+        const bool hasSample = name.isNotEmpty();
+
+        const auto loadedMarker =
+            juce::String("Sample ")
+            + juce::String::charToString(0x2022);
+
+        sampleButton.setButtonText(hasSample ? loadedMarker
+                                             : juce::String("Sample"));
+
+        sampleButton.setTooltip(
+            hasSample ? "Loaded sample: " + name
+                      : juce::String("Load a WAV or AIFF sample"));
+    };
+
+    updateSampleButton();
+
+    sampleButton.onClick = [this, updateSampleButton]
+    {
+        juce::PopupMenu menu;
+        menu.setLookAndFeel(&lnf);
+
+        const auto sampleName = processorRef.getSampleName();
+        const bool hasSample = sampleName.isNotEmpty();
+
+        menu.addSectionHeader("SAMPLE SOURCE");
+        menu.addItem(3,
+                     hasSample ? "Active: " + sampleName
+                               : juce::String("No sample loaded"),
+                     false,
+                     false);
+        menu.addSeparator();
+        menu.addItem(1, "Load WAV or AIFF...");
+        menu.addItem(2, "Clear sample", hasSample);
+
+        menu.showMenuAsync(
+            juce::PopupMenu::Options().withTargetComponent(sampleButton),
+            [this, updateSampleButton](int menuResult)
+            {
+                if (menuResult == 1)
+                {
+                    sampleChooser = std::make_unique<juce::FileChooser>(
+                        "Load sample",
+                        juce::File::getSpecialLocation(
+                            juce::File::userMusicDirectory),
+                        "*.wav;*.aif;*.aiff");
+
+                    sampleChooser->launchAsync(
+                        juce::FileBrowserComponent::openMode
+                            | juce::FileBrowserComponent::canSelectFiles,
+                        [this, updateSampleButton](
+                            const juce::FileChooser& fc)
+                        {
+                            const auto file = fc.getResult();
+
+                            if (! file.existsAsFile())
+                                return;
+
+                            const auto loadResult =
+                                processorRef.loadSample(file);
+
+                            if (loadResult)
+                            {
+                                updateSampleButton();
+                            }
+                            else
+                            {
+                                juce::AlertWindow::showMessageBoxAsync(
+                                    juce::MessageBoxIconType::WarningIcon,
+                                    "Sample import failed",
+                                    loadResult.error);
+                            }
+                        });
+                }
+                else if (menuResult == 2)
+                {
+                    processorRef.clearSample();
+                    updateSampleButton();
+                }
+            });
+    };
+
+    addAndMakeVisible(sampleButton);
+
 
     // ---- keyboard
     keyboard.setColour(juce::MidiKeyboardComponent::whiteNoteColourId, juce::Colour(0xffc9c1b1));
@@ -366,7 +480,7 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
     setLookAndFeel(nullptr);
 }
 
-void GaldrAudioProcessorEditor::timerCallback()
+    void GaldrAudioProcessorEditor::timerCallback()
 {
     // Group the parameter edits since the last tick into one undoable step.
     processorRef.undoManager.beginNewTransaction();
@@ -381,6 +495,36 @@ void GaldrAudioProcessorEditor::timerCallback()
     presetNameButton.setButtonText(name);
 
     tuningButton.setButtonText(processorRef.getTuningName());
+    const auto* sampleMode =
+    processorRef.apvts.getRawParameterValue(pid::sampleMode);
+
+    const bool granularEnabled =
+    sampleMode != nullptr && sampleMode->load() >= 0.5f;
+
+    for (auto& section : sections)
+{
+    if (section.title != "Granular")
+        continue;
+
+    if (section.enabled == granularEnabled)
+        break;
+
+    section.enabled = granularEnabled;
+
+    for (auto& row : section.rows)
+    {
+        for (auto* component : row.comps)
+            if (component != nullptr)
+                component->setEnabled(granularEnabled);
+
+        for (auto* label : row.labels)
+            if (label != nullptr)
+                label->setEnabled(granularEnabled);
+    }
+
+    repaint(section.bounds);
+    break;
+}
 }
 
 bool GaldrAudioProcessorEditor::keyPressed(const juce::KeyPress& key)
@@ -578,7 +722,8 @@ void GaldrAudioProcessorEditor::resized()
                      sc(s.baseBounds.getWidth()), sc(s.baseBounds.getHeight()) };
         layoutSection(s, scale);
     }
-
+    sampleButton.setBounds(sc(360), sc(20), sc(110), sc(26));
+    tuningButton.setBounds(sc(baseW - 690), sc(20), sc(104), sc(26));
     tuningButton.setBounds(sc(baseW - 690), sc(20), sc(104), sc(26));
     undoButton.setBounds(sc(baseW - 578), sc(20), sc(52), sc(26));
     redoButton.setBounds(sc(baseW - 522), sc(20), sc(52), sc(26));
@@ -692,14 +837,20 @@ void GaldrAudioProcessorEditor::paint(juce::Graphics& g)
 
     // section panels
     for (const auto& s : sections)
-    {
-        auto b = s.bounds;
+{
+    const juce::Graphics::ScopedSaveState state(g);
+    g.setOpacity(s.enabled ? 1.0f : 0.34f);
 
-juce::ColourGradient stone(
-    theme::panel.brighter(0.08f).withAlpha(0.84f),
-    (float) b.getX(), (float) b.getY(),
-    theme::iron.darker(0.12f).withAlpha(0.92f),
-    (float) b.getX(), (float) b.getBottom(), false);
+    auto b = s.bounds;
+
+    juce::ColourGradient stone(
+        theme::panel.brighter(0.08f).withAlpha(0.84f),
+        (float) b.getX(),
+        (float) b.getY(),
+        theme::iron.darker(0.12f).withAlpha(0.92f),
+        (float) b.getX(),
+        (float) b.getBottom(),
+        false);
 
     g.setGradientFill(stone);
     g.fillRect(b);
@@ -711,25 +862,28 @@ juce::ColourGradient stone(
     g.drawRect(b.reduced(sc(2)), 1);
 
     g.setColour(theme::outline.withAlpha(0.28f));
-    g.drawHorizontalLine(b.getY() + 1,
-                     (float) b.getX() + sc(2),
-                     (float) b.getRight() - sc(2));
+    g.drawHorizontalLine(
+        b.getY() + 1,
+        (float) b.getX() + sc(2),
+        (float) b.getRight() - sc(2));
 
-                g.setFont(lnf.getBodyFont(15.0f * scale));
-        g.setColour(theme::bone.withAlpha(0.76f));
-        g.drawText(s.title,
-                   b.getX() + sc(8),
-                   b.getY() + 2,
-                   b.getWidth() - sc(16),
-                   sc(16),
-                   juce::Justification::centredLeft);
+    g.setFont(lnf.getBodyFont(15.0f * scale));
+    g.setColour(theme::bone.withAlpha(0.76f));
+    g.drawText(
+        s.title,
+        b.getX() + sc(8),
+        b.getY() + 2,
+        b.getWidth() - sc(16),
+        sc(16),
+        juce::Justification::centredLeft);
 
-        g.setColour(theme::bloodBright.withAlpha(0.60f));
-        g.fillRect((float) b.getX() + 8.0f * scale,
-                   (float) b.getY() + 18.0f * scale,
-                   24.0f * scale,
-                   1.5f);
-    }
+    g.setColour(theme::bloodBright.withAlpha(0.60f));
+    g.fillRect(
+        (float) b.getX() + 8.0f * scale,
+        (float) b.getY() + 18.0f * scale,
+        24.0f * scale,
+        1.5f);
+}
 
     // outer frame and corner brackets
     g.setColour(theme::outline);

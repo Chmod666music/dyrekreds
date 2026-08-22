@@ -79,6 +79,52 @@ std::vector<float> render(GaldrAudioProcessor& p, double sr, int blockSize, doub
     }
     return out;
 }
+    struct StereoRender
+{
+    std::vector<float> left;
+    std::vector<float> right;
+};
+
+    StereoRender renderStereo(
+    GaldrAudioProcessor& p,
+    double sr,
+    int blockSize,
+    double seconds,
+    const std::vector<Event>& events)
+{
+    const int total =
+        ((int) std::ceil(seconds * sr / blockSize)) * blockSize;
+
+    StereoRender out;
+    out.left.reserve((size_t) total);
+    out.right.reserve((size_t) total);
+
+    juce::AudioBuffer<float> buffer(
+        juce::jmax(2, p.getTotalNumOutputChannels()),
+        blockSize);
+
+    for (int pos = 0; pos < total; pos += blockSize)
+    {
+        juce::MidiBuffer midi;
+
+        for (const auto& event : events)
+            if (event.sample >= pos
+                && event.sample < pos + blockSize)
+            {
+                midi.addEvent(event.msg, event.sample - pos);
+            }
+
+        p.processBlock(buffer, midi);
+
+        for (int i = 0; i < blockSize; ++i)
+        {
+            out.left.push_back(buffer.getSample(0, i));
+            out.right.push_back(buffer.getSample(1, i));
+        }
+    }
+
+    return out;
+}
 
 float peakIn(const std::vector<float>& v, double sr, double t0, double t1)
 {
@@ -126,7 +172,339 @@ bool allFinite(const std::vector<float>& v, float& worst)
     }
     return ok;
 }
+void testSampleLoading()
+{
+    std::cout << "sample loading" << std::endl;
 
+    constexpr double sampleRate = 48000.0;
+    constexpr int numSamples = 4800;
+
+    auto file = juce::File::getSpecialLocation(juce::File::tempDirectory)
+                    .getNonexistentChildFile(
+                        "dyrekreds-sample-loader", ".wav", false);
+
+    juce::AudioBuffer<float> source(1, numSamples);
+
+    for (int i = 0; i < numSamples; ++i)
+    {
+        const auto phase =
+            juce::MathConstants<double>::twoPi
+            * 220.0
+            * (double) i
+            / sampleRate;
+
+        source.setSample(0, i, 0.5f * (float) std::sin(phase));
+    }
+
+    juce::WavAudioFormat wavFormat;
+
+    std::unique_ptr<juce::AudioFormatWriter> writer(
+        wavFormat.createWriterFor(
+            new juce::FileOutputStream(file),
+            sampleRate,
+            1,
+            16,
+            {},
+            0));
+
+    check(writer != nullptr, "temporary WAV writer opens");
+
+    if (writer == nullptr)
+    {
+        file.deleteFile();
+        return;
+    }
+
+    check(writer->writeFromAudioSampleBuffer(
+              source, 0, numSamples),
+          "temporary WAV is written");
+
+    writer.reset();
+
+    GaldrAudioProcessor processor;
+
+    const auto loaded = processor.loadSample(file);
+
+    check((bool) loaded, "WAV sample loads");
+
+    if (loaded)
+    {
+        check(loaded.sample->isValid(),
+              "loaded sample is valid");
+
+        check(loaded.sample->audio.getNumChannels() == 1,
+              "mono channel count survives");
+
+        check(loaded.sample->audio.getNumSamples() == numSamples,
+              "sample length survives");
+
+        check(std::abs(loaded.sample->sampleRate - sampleRate) < 0.01,
+              "sample rate survives");
+
+        check(processor.getSampleName()
+                  == file.getFileNameWithoutExtension(),
+              "sample name is exposed");
+    }
+
+        neutralise(processor);
+    setParam(processor, pid::osc1Lvl, 0.0f);
+    setParam(processor, pid::osc2Lvl, 0.0f);
+    setParam(processor, pid::subLvl, 0.0f);
+    setParam(processor, pid::noiseLvl, 0.0f);
+    setParam(processor, pid::attack, 0.001f);
+    setParam(processor, pid::decay, 0.001f);
+    setParam(processor, pid::sustain, 1.0f);
+    setParam(processor, pid::release, 0.01f);
+    setParam(processor, pid::filterDrive, 0.0f);
+    setParam(processor, pid::gain, 1.0f);
+
+    processor.prepareToPlay(sampleRate, 128);
+
+    const std::vector<Event> sampleEvents {
+        { 0,          juce::MidiMessage::noteOn(1, 60, 1.0f) },
+        { numSamples, juce::MidiMessage::noteOff(1, 60) }
+    };
+
+    const auto sampleRender =
+        render(processor, sampleRate, 128, 0.12, sampleEvents);
+
+    check(peakIn(sampleRender, sampleRate, 0.005, 0.09) > 0.01f,
+          "loaded sample renders from MIDI with oscillators muted");
+
+    const float rootC4Frequency =
+        measureFreq(sampleRender, sampleRate, 0.005, 0.09);
+
+    check(std::abs(rootC4Frequency / 220.0f - 1.0f) < 0.01f,
+          "root C4 preserves the sample pitch");
+
+    setParam(processor, pid::sampleRoot, 72.0f);
+
+    const auto rootC5Render =
+        render(processor, sampleRate, 128, 0.12, sampleEvents);
+
+    const float rootC5Frequency =
+        measureFreq(rootC5Render, sampleRate, 0.005, 0.09);
+
+    check(std::abs(rootC5Frequency / 110.0f - 1.0f) < 0.01f,
+          "root C5 transposes the sample down one octave");
+    setParam(processor, pid::sampleMode, 1.0f);
+    setParam(processor, pid::sampleRoot, 60.0f);
+    setParam(processor, pid::grainSize, 0.04f);
+    setParam(processor, pid::grainDensity, 20.0f);
+    setParam(processor, pid::grainPosition, 0.0f);
+    setParam(processor, pid::grainSpread, 0.0f);
+
+    const auto granularRender =
+        render(processor, sampleRate, 128, 0.12, sampleEvents);
+
+    check(peakIn(granularRender, sampleRate, 0.005, 0.09) > 0.001f,
+        "granular mode renders audible grains");
+
+    float granularWorst = 0.0f;
+    const bool granularFinite =
+    allFinite(granularRender, granularWorst);
+
+    check(granularFinite,
+      "granular output stays finite and bounded"
+          " (worst "
+          + juce::String(granularWorst, 4)
+          + ")");
+    const juce::StringArray motionNames {
+    "Forward",
+    "Random",
+    "Drift",
+    "Reverse",
+    "Bounce"
+};
+
+    for (int motion = 0; motion < motionNames.size(); ++motion)
+{
+    setParam(
+        processor,
+        pid::grainMotion,
+        (float) motion);
+
+    setParam(processor, pid::grainPosition, 0.5f);
+    setParam(processor, pid::grainDensity, 24.0f);
+    setParam(processor, pid::grainSpread, 0.15f);
+
+    const auto motionRender =
+        render(
+            processor,
+            sampleRate,
+            128,
+            0.12,
+            sampleEvents);
+
+    float motionWorst = 0.0f;
+    const bool motionFinite =
+        allFinite(motionRender, motionWorst);
+
+    const auto motionName =
+        motionNames[motion];
+
+    check(
+        peakIn(
+            motionRender,
+            sampleRate,
+            0.005,
+            0.09) > 0.001f,
+        motionName
+            + " motion renders audible grains");
+
+    check(
+        motionFinite,
+        motionName
+            + " motion stays finite and bounded"
+            + " (worst "
+            + juce::String(motionWorst, 4)
+            + ")");
+
+    const float playhead =
+        processor.getGranularPlayhead();
+
+    check(
+        playhead >= 0.0f
+            && playhead <= 1.0f,
+        motionName
+            + " playhead stays inside the sample"
+            + " (position "
+            + juce::String(playhead, 4)
+            + ")");
+}
+
+setParam(processor, pid::grainMotion, 0.0f);
+    setParam(processor, pid::grainDensity, 80.0f);
+    setParam(processor, pid::grainStereo, 1.0f);
+
+    const auto stereoGranularRender =
+    renderStereo(
+        processor,
+        sampleRate,
+        128,
+        0.12,
+        sampleEvents);
+
+    float stereoDifference = 0.0f;
+
+    const int stereoStart =
+    juce::jlimit(
+        0,
+        (int) stereoGranularRender.left.size(),
+        (int) (0.005 * sampleRate));
+
+    const int stereoEnd =
+    juce::jlimit(
+        0,
+        (int) stereoGranularRender.left.size(),
+        (int) (0.09 * sampleRate));
+
+    for (int i = stereoStart; i < stereoEnd; ++i)
+{
+    stereoDifference =
+        juce::jmax(
+            stereoDifference,
+            std::abs(
+                stereoGranularRender.left[(size_t) i]
+                - stereoGranularRender.right[(size_t) i]));
+}
+
+    check(
+    stereoDifference > 0.001f,
+    "granular stereo spread separates left and right"
+        " (difference "
+        + juce::String(stereoDifference, 4)
+        + ")");
+    setParam(processor, pid::sampleMode, 2.0f);
+    setParam(processor, pid::grainPosition, 0.5f);
+    setParam(processor, pid::grainSpread, 0.0f);
+    setParam(processor, pid::grainStereo, 0.0f);
+    setParam(processor, pid::grainDensity, 20.0f);
+
+    const auto freezeRender =
+    render(
+        processor,
+        sampleRate,
+        128,
+        0.12,
+        sampleEvents);
+
+    check(
+    peakIn(freezeRender, sampleRate, 0.005, 0.09) > 0.001f,
+    "freeze mode renders audible grains");
+
+    float freezeWorst = 0.0f;
+    const bool freezeFinite =
+    allFinite(freezeRender, freezeWorst);
+
+    check(
+    freezeFinite,
+    "freeze output stays finite and bounded"
+        " (worst "
+        + juce::String(freezeWorst, 4)
+        + ")");
+
+    setParam(processor, pid::sampleLvl, 0.0f);
+
+    const auto mutedSampleRender =
+        render(processor, sampleRate, 128, 0.12, sampleEvents);
+
+    check(peakIn(mutedSampleRender, sampleRate, 0.005, 0.09) < 1.0e-5f,
+          "sample level can mute the sample source");
+
+    const auto sampleBeforeFailure = processor.currentSample();
+
+    const auto failed = processor.loadSample(
+        file.getSiblingFile("missing-dyrekreds-sample.wav"));
+
+    check(! failed, "missing sample is rejected");
+
+    check(processor.currentSample() == sampleBeforeFailure,
+          "failed load keeps the current sample");
+    const auto presetState =
+    processor.capturePresetState();
+
+    check(
+    ! presetState.hasProperty("sampleFile")
+        && ! presetState.hasProperty("hasSampleState"),
+    "preset state omits the sample file");
+
+    juce::MemoryBlock sessionState;
+    processor.getStateInformation(sessionState);
+
+    GaldrAudioProcessor restoredProcessor;
+
+    restoredProcessor.setStateInformation(
+    sessionState.getData(),
+    (int) sessionState.getSize());
+
+    const auto restoredSample =
+    restoredProcessor.currentSample();
+
+    check(
+    restoredSample != nullptr
+        && restoredSample->isValid(),
+    "host state restores the loaded sample");
+
+    if (restoredSample != nullptr)
+{
+    check(
+        restoredSample->sourceFile == file,
+        "host state restores the sample path");
+
+    check(
+        restoredSample->audio.getNumSamples()
+            == numSamples,
+        "host state restores the sample audio");
+}
+    processor.clearSample();
+
+    check(processor.currentSample() == nullptr,
+          "sample can be cleared");
+
+    check(file.deleteFile(),
+          "temporary WAV is removed");
+}
 void testStateRoundTrip()
 {
     std::cout << "state round-trip" << std::endl;
@@ -574,6 +952,7 @@ int main()
     juce::ScopedJuceInitialiser_GUI juceInit;
     std::cout << "Dyrekreds headless" << std::endl;
 
+    testSampleLoading();
     testStateRoundTrip();
     testMidiLearn();
     testTuningParser();

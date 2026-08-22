@@ -31,6 +31,8 @@ GaldrAudioProcessor::GaldrAudioProcessor()
 {
     settings.noteFreqs = tuning.freqs;
     settings.noteCounter = &noteSerial;
+    settings.sampleSource = &sampleData;
+    settings.granularPlayhead = &granularPlayhead;
 
     for (int i = 0; i < numVoices; ++i)
         synth.addVoice(new GaldrVoice(settings));
@@ -50,6 +52,46 @@ GaldrAudioProcessor::~GaldrAudioProcessor()
     for (auto* p : getParameters())
         if (auto* rp = dynamic_cast<juce::RangedAudioParameter*>(p))
             apvts.removeParameterListener(rp->paramID, this);
+}
+
+dyrekreds::SampleLoadResult
+GaldrAudioProcessor::loadSample(const juce::File& file)
+{
+    auto result = dyrekreds::SampleLoader::load(file);
+
+    if (result)
+    {
+        std::atomic_store_explicit(&sampleData,
+                                   result.sample,
+                                   std::memory_order_release);
+        presetDirty.store(true);
+    }
+
+    return result;
+}
+
+void GaldrAudioProcessor::clearSample()
+{
+    std::shared_ptr<const dyrekreds::SampleData> empty;
+    std::atomic_store_explicit(&sampleData,
+                               std::move(empty),
+                               std::memory_order_release);
+    presetDirty.store(true);
+}
+
+std::shared_ptr<const dyrekreds::SampleData>
+GaldrAudioProcessor::currentSample() const
+{
+    return std::atomic_load_explicit(&sampleData,
+                                     std::memory_order_acquire);
+}
+
+juce::String GaldrAudioProcessor::getSampleName() const
+{
+    if (auto sample = currentSample())
+        return sample->name;
+
+    return {};
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout createGaldrParameterLayout()
@@ -110,6 +152,38 @@ juce::AudioProcessorValueTreeState::ParameterLayout createGaldrParameterLayout()
             return String(value, 1) + " /s";
         });
 
+    const auto midiNote = AudioParameterIntAttributes()
+        .withStringFromValueFunction([](int value, int)
+        {
+            return MidiMessage::getMidiNoteName(value, true, true, 4);
+        })
+        .withValueFromStringFunction([](const String& text)
+        {
+            const auto value = text.trim().toUpperCase();
+
+            if (value.containsOnly("0123456789+-"))
+                return jlimit(0, 127, value.getIntValue());
+
+            const StringArray noteNames {
+                "C", "C#", "D", "D#", "E", "F",
+                "F#", "G", "G#", "A", "A#", "B"
+            };
+
+            const int nameLength =
+                value.length() > 1 && value[1] == '#' ? 2 : 1;
+
+            const int semitone =
+                noteNames.indexOf(value.substring(0, nameLength));
+
+            if (semitone < 0)
+                return 60;
+
+            const int octave =
+                value.substring(nameLength).getIntValue();
+
+            return jlimit(0, 127, (octave + 1) * 12 + semitone);
+        });
+
     const StringArray waveNames { "Saw", "Square", "Pulse", "Triangle", "Sine", "Wavetable" };
     const StringArray lfoShapes { "Sine", "Triangle", "Saw", "Square", "S&H" };
     const StringArray syncNames { "Free", "2/1", "1/1", "1/2", "1/4", "1/8", "1/8T", "1/16", "1/16T", "1/32" };
@@ -136,7 +210,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout createGaldrParameterLayout()
 
     // OSC 2
     add(std::make_unique<AudioParameterChoice>(ParameterID { pid::osc2Wave, 1 }, "Osc 2 Wave", waveNames, 0));
-    add(std::make_unique<AudioParameterInt>(ParameterID { pid::osc2Oct, 1 }, "Osc 2 Octave", -2, 2, 0));
+        add(std::make_unique<AudioParameterInt>(ParameterID {  pid::osc2Oct, 1 }, "Osc 2 Octave", -2, 2, 0));
     add(std::make_unique<AudioParameterInt>(ParameterID { pid::osc2Semi, 1 }, "Osc 2 Semi", -12, 12, 0));
     add(std::make_unique<AudioParameterInt>(ParameterID { pid::osc2Uni, 1 }, "Osc 2 Unison", 1, 7, 1));
     add(std::make_unique<AudioParameterFloat>(ParameterID { pid::osc2Det, 1 }, "Osc 2 Detune",
@@ -157,7 +231,76 @@ juce::AudioProcessorValueTreeState::ParameterLayout createGaldrParameterLayout()
         StringArray { "White", "Pink" }, 0));
     add(std::make_unique<AudioParameterFloat>(ParameterID { pid::noiseLvl, 1 }, "Noise Level", zeroOne, 0.0f, percent));
 
+    // SAMPLE AND GRANULAR SOURCE
+    add(std::make_unique<AudioParameterChoice>(
+    ParameterID { pid::sampleMode, 1 },
+    "Sample Mode",
+    StringArray { "Sample", "Granular", "Freeze" },
+    0));
+
+    add(std::make_unique<AudioParameterFloat>(
+        ParameterID { pid::sampleLvl, 1 },
+        "Sample Level",
+        zeroOne,
+        0.7f,
+        percent));
+
+    add(std::make_unique<AudioParameterInt>(
+        ParameterID { pid::sampleRoot, 1 },
+        "Sample Root Note",
+        0,
+        127,
+        60,
+        midiNote));
+
+    add(std::make_unique<AudioParameterChoice>(
+    ParameterID { pid::grainMotion, 1 },
+    "Grain Motion",
+    StringArray {
+        "Forward",
+        "Random",
+        "Drift",
+        "Reverse",
+        "Bounce"
+    },
+    0));
+
+    add(std::make_unique<AudioParameterFloat>(
+        ParameterID { pid::grainSize, 1 },
+        "Grain Size",
+        NormalisableRange<float>(0.005f, 0.5f, 0.0f, 0.35f),
+        0.08f,
+        seconds));
+
+    add(std::make_unique<AudioParameterFloat>(
+        ParameterID { pid::grainDensity, 1 },
+        "Grain Density",
+        NormalisableRange<float>(1.0f, 80.0f, 0.0f, 0.4f),
+        12.0f,
+        perSecond));
+
+    add(std::make_unique<AudioParameterFloat>(
+        ParameterID { pid::grainPosition, 1 },
+        "Grain Position",
+        zeroOne,
+        0.0f,
+        percent));
+
+    add(std::make_unique<AudioParameterFloat>(
+        ParameterID { pid::grainSpread, 1 },
+        "Grain Position Spread",
+        zeroOne,
+        0.25f,
+        percent));
+    add(std::make_unique<AudioParameterFloat>(
+        ParameterID { pid::grainStereo, 1 },
+        "Grain Stereo Spread",
+        zeroOne,
+        0.0f,
+        percent));
+
     // FILTER
+
     add(std::make_unique<AudioParameterChoice>(ParameterID { pid::filterType, 1 }, "Filter Type",
         StringArray { "LP 24", "LP 12", "HP", "BP", "Formant" }, 0));
     add(std::make_unique<AudioParameterFloat>(ParameterID { pid::vowel, 1 }, "Vowel", zeroOne, 0.0f, percent));
@@ -383,6 +526,16 @@ void GaldrAudioProcessor::updateSettings(int numSamples)
     settings.subLvl    = raw(pid::subLvl);
     settings.noiseType = (int) raw(pid::noiseType);
     settings.noiseLvl  = raw(pid::noiseLvl);
+
+    settings.sampleMode     = (int) raw(pid::sampleMode);
+    settings.sampleLvl      = raw(pid::sampleLvl);
+    settings.sampleRoot     = (int) raw(pid::sampleRoot);
+    settings.grainMotion    = (int) raw(pid::grainMotion);
+    settings.grainSize      = raw(pid::grainSize);
+    settings.grainDensity   = raw(pid::grainDensity);
+    settings.grainPosition  = raw(pid::grainPosition);
+    settings.grainSpread    = raw(pid::grainSpread);
+    settings.grainStereo    = raw(pid::grainStereo);
 
     settings.filterType  = (int) raw(pid::filterType);
     settings.cutoff      = raw(pid::cutoff);
@@ -917,7 +1070,19 @@ juce::ValueTree GaldrAudioProcessor::captureFullState()
         if (auto* p = midiCCMap[cc].load())
             map.appendChild(juce::ValueTree("MAP", { { "cc", cc }, { "param", p->paramID } }), nullptr);
     if (map.getNumChildren() > 0)
-        tree.appendChild(map, nullptr);
+    tree.appendChild(map, nullptr);
+    tree.setProperty("hasSampleState", true, nullptr);
+    if (const auto sample = currentSample();
+    sample != nullptr
+        && sample->isValid()
+        && sample->sourceFile.existsAsFile())
+{
+    tree.setProperty(
+        "sampleFile",
+        sample->sourceFile.getFullPathName(),
+        nullptr);
+}
+
     return tree;
 }
 
@@ -935,7 +1100,14 @@ void GaldrAudioProcessor::applyStateTree(juce::ValueTree tree)
         return;
 
     migrateState(tree, (int) tree.getProperty("stateVersion", 0));
+    const bool restoresSample =
+    (bool) tree.getProperty("hasSampleState", false);
 
+    const auto samplePath =
+    tree.getProperty("sampleFile").toString();
+
+    tree.removeProperty("hasSampleState", nullptr);
+    tree.removeProperty("sampleFile", nullptr);
     // Restore CC mappings only when the state carries them (host sessions do,
     // preset files don't: loading a sound must not clobber the controller setup).
     if (auto map = tree.getChildWithName("MIDIMAP"); map.isValid())
@@ -953,7 +1125,29 @@ void GaldrAudioProcessor::applyStateTree(juce::ValueTree tree)
     midiLearnTarget.store(nullptr);
 
     apvts.replaceState(tree);
+    if (restoresSample)
+{
+    std::shared_ptr<const dyrekreds::SampleData> restoredSample;
 
+    if (samplePath.isNotEmpty())
+    {
+        const auto result =
+            dyrekreds::SampleLoader::load(
+                juce::File(samplePath));
+
+        if (result)
+            restoredSample = result.sample;
+    }
+
+    std::atomic_store_explicit(
+        &sampleData,
+        std::move(restoredSample),
+        std::memory_order_release);
+
+    granularPlayhead.store(
+        0.0f,
+        std::memory_order_relaxed);
+}
     const auto tuningData = apvts.state.getProperty("tuningData").toString();
     const auto tuningName = apvts.state.getProperty("tuningName").toString();
     const auto tuningPath = apvts.state.getProperty("tuningFile").toString();

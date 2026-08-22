@@ -51,13 +51,14 @@ private:
     };
 
     struct Section
-    {
-        juce::String title;
-        juce::Rectangle<int> baseBounds;        // layout at reference size
-        juce::Rectangle<int> bounds;            // scaled, set in resized()
-        std::vector<Row> rows;
-        juce::Component* custom = nullptr;      // fills the body instead of rows
-    };
+{
+    juce::String title;
+    juce::Rectangle<int> baseBounds;       // layout at reference size
+    juce::Rectangle<int> bounds;           // scaled, set in resized()
+    std::vector<Row> rows;
+    juce::Component* custom = nullptr;     // fills the body instead of rows
+    bool enabled = true;
+};
 
     Section& addSection(const juce::String& title, juce::Rectangle<int> baseBounds);
     Section& addCustomSection(const juce::String& title, juce::Rectangle<int> baseBounds,
@@ -80,14 +81,17 @@ private:
 
     juce::MidiKeyboardComponent keyboard;
     galdr::ScopeComponent scope;
+    galdr::SampleWaveformComponent sampleWaveform;
     galdr::SpectrumComponent spectrum;
 
     juce::TextButton presetPrev { "<" }, presetNext { ">" };
     juce::TextButton presetNameButton;
     juce::TextButton undoButton { "Undo" }, redoButton { "Redo" };
     juce::TextButton saveButton { "Save" }, tuningButton;
+    juce::TextButton sampleButton { "Sample" };
     juce::TooltipWindow tooltipWindow { this };
     std::unique_ptr<juce::FileChooser> chooser;
+    std::unique_ptr<juce::FileChooser> sampleChooser;
     std::unique_ptr<PresetBrowser> presetBrowser;
 
     juce::OwnedArray<Knob> knobs;

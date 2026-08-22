@@ -10,6 +10,7 @@
 #include "DarkReverb.h"
 #include "Blizzard.h"
 #include "ScalaTuning.h"
+#include "SampleData.h"
 #include "Visualizers.h"
 
 class GaldrAudioProcessor : public juce::AudioProcessor,
@@ -45,11 +46,20 @@ public:
     bool loadTuning(const juce::File& sclFile);
     void resetTuning();
     juce::String getTuningName() const { return tuning.name; }
+        // Sample files are decoded on the calling thread and published atomically.
+    dyrekreds::SampleLoadResult loadSample(const juce::File& file);
+    void clearSample();
+    std::shared_ptr<const dyrekreds::SampleData> currentSample() const;
+    juce::String getSampleName() const;
+    float getGranularPlayhead() const noexcept
+{
+    return granularPlayhead.load(std::memory_order_relaxed);
+}
 
     // Versioned state. captureFullState is what the host stores; preset files
     // use capturePresetState (no MIDI map: controller setup is not a sound).
     // applyStateTree migrates old versions and restores tuning and mappings.
-    static constexpr int stateVersion = 1;
+    static constexpr int stateVersion = 2;
     juce::ValueTree captureFullState();
     juce::ValueTree capturePresetState();
     void applyStateTree(juce::ValueTree tree);
@@ -87,6 +97,8 @@ private:
     GaldrSynth synth;
     GaldrVoice::Settings settings;
     galdr::Tuning tuning;
+    std::shared_ptr<const dyrekreds::SampleData> sampleData;
+    std::atomic<float> granularPlayhead { 0.0f };
 
     // MIDI CC -> parameter map, written on the message thread, read per block.
     std::atomic<juce::RangedAudioParameter*> midiCCMap[128] {};

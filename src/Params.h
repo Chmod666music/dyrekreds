@@ -32,6 +32,17 @@ namespace pid
     inline constexpr auto noiseType  = "noiseType";
     inline constexpr auto noiseLvl   = "noiseLvl";
 
+    // Dyrekreds sample and granular source
+    inline constexpr auto sampleMode    = "sampleMode";
+    inline constexpr auto sampleLvl     = "sampleLvl";
+    inline constexpr auto sampleRoot    = "sampleRoot";
+    inline constexpr auto grainMotion   = "grainMotion";
+    inline constexpr auto grainSize     = "grainSize";
+    inline constexpr auto grainDensity  = "grainDensity";
+    inline constexpr auto grainPosition = "grainPosition";
+    inline constexpr auto grainSpread   = "grainSpread";
+    inline constexpr auto grainStereo   = "grainStereo";
+
     // filter
     inline constexpr auto filterType  = "filterType";
     inline constexpr auto cutoff      = "cutoff";
