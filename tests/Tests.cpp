@@ -309,6 +309,71 @@ void testSampleLoading()
           " (worst "
           + juce::String(granularWorst, 4)
           + ")");
+    const juce::StringArray motionNames {
+    "Forward",
+    "Random",
+    "Drift",
+    "Reverse",
+    "Bounce"
+};
+
+    for (int motion = 0; motion < motionNames.size(); ++motion)
+{
+    setParam(
+        processor,
+        pid::grainMotion,
+        (float) motion);
+
+    setParam(processor, pid::grainPosition, 0.5f);
+    setParam(processor, pid::grainDensity, 24.0f);
+    setParam(processor, pid::grainSpread, 0.15f);
+
+    const auto motionRender =
+        render(
+            processor,
+            sampleRate,
+            128,
+            0.12,
+            sampleEvents);
+
+    float motionWorst = 0.0f;
+    const bool motionFinite =
+        allFinite(motionRender, motionWorst);
+
+    const auto motionName =
+        motionNames[motion];
+
+    check(
+        peakIn(
+            motionRender,
+            sampleRate,
+            0.005,
+            0.09) > 0.001f,
+        motionName
+            + " motion renders audible grains");
+
+    check(
+        motionFinite,
+        motionName
+            + " motion stays finite and bounded"
+            + " (worst "
+            + juce::String(motionWorst, 4)
+            + ")");
+
+    const float playhead =
+        processor.getGranularPlayhead();
+
+    check(
+        playhead >= 0.0f
+            && playhead <= 1.0f,
+        motionName
+            + " playhead stays inside the sample"
+            + " (position "
+            + juce::String(playhead, 4)
+            + ")");
+}
+
+setParam(processor, pid::grainMotion, 0.0f);
     setParam(processor, pid::grainDensity, 80.0f);
     setParam(processor, pid::grainStereo, 1.0f);
 
