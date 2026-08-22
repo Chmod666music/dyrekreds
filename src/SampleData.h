@@ -18,6 +18,7 @@ struct SampleData
     double sampleRate = 0.0;
     juce::String name;
     juce::File sourceFile;
+    juce::MemoryBlock encodedFile;
 
     bool isValid() const noexcept
     {
@@ -46,19 +47,71 @@ struct SampleLoadResult
 class SampleLoader
 {
 public:
+    static constexpr size_t maximumEncodedBytes =
+        64u * 1024u * 1024u;
+
     static SampleLoadResult load(const juce::File& file)
     {
         if (! file.existsAsFile())
             return { {}, "The selected sample file does not exist." };
 
+        if (file.getSize()
+            > (juce::int64) maximumEncodedBytes)
+        {
+            return {
+                {},
+                "The sample is larger than the 64 MiB embedded-sample limit."
+            };
+        }
+
+        juce::MemoryBlock encodedFile;
+
+        if (! file.loadFileAsData(encodedFile))
+            return { {}, "The selected sample file could not be read." };
+
+        return decode(
+            encodedFile,
+            file.getFileNameWithoutExtension(),
+            file);
+    }
+
+    static SampleLoadResult load(
+        const juce::MemoryBlock& encodedFile,
+        const juce::String& name)
+    {
+        return decode(encodedFile, name, {});
+    }
+
+private:
+    static SampleLoadResult decode(
+        const juce::MemoryBlock& encodedFile,
+        const juce::String& name,
+        const juce::File& sourceFile)
+    {
+        if (encodedFile.isEmpty())
+            return { {}, "The embedded sample contains no data." };
+
+        if (encodedFile.getSize() > maximumEncodedBytes)
+        {
+            return {
+                {},
+                "The sample is larger than the 64 MiB embedded-sample limit."
+            };
+        }
+
         juce::AudioFormatManager formats;
         formats.registerBasicFormats();
 
+        auto stream =
+            std::make_unique<juce::MemoryInputStream>(
+                encodedFile,
+                false);
+
         std::unique_ptr<juce::AudioFormatReader> reader(
-            formats.createReaderFor(file));
+            formats.createReaderFor(std::move(stream)));
 
         if (reader == nullptr)
-            return { {}, "The file is not a supported WAV or AIFF sample." };
+            return { {}, "The data is not a supported WAV or AIFF sample." };
 
         if (reader->sampleRate <= 0.0
             || reader->lengthInSamples <= 0
@@ -87,19 +140,21 @@ public:
 
         loaded->audio.setSize(channels, samples);
 
-        if (! reader->read(&loaded->audio,
-                           0,
-                           samples,
-                           0,
-                           true,
-                           true))
+        if (! reader->read(
+                &loaded->audio,
+                0,
+                samples,
+                0,
+                true,
+                true))
         {
             return { {}, "The sample could not be decoded." };
         }
 
         loaded->sampleRate = reader->sampleRate;
-        loaded->name = file.getFileNameWithoutExtension();
-        loaded->sourceFile = file;
+        loaded->name = name.isNotEmpty() ? name : "Embedded Sample";
+        loaded->sourceFile = sourceFile;
+        loaded->encodedFile = encodedFile;
 
         return { std::move(loaded), {} };
     }

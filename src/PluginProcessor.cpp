@@ -1057,8 +1057,34 @@ juce::ValueTree GaldrAudioProcessor::capturePresetState()
 {
     auto tree = apvts.copyState();
     tree.setProperty("stateVersion", stateVersion, nullptr);
+
     if (auto map = tree.getChildWithName("MIDIMAP"); map.isValid())
         tree.removeChild(map, nullptr);
+
+    tree.setProperty("hasSampleState", true, nullptr);
+
+    if (const auto sample = currentSample();
+        sample != nullptr && sample->isValid())
+    {
+        tree.setProperty(
+            "sampleName",
+            sample->name,
+            nullptr);
+
+        tree.setProperty(
+            "sampleData",
+            juce::var(sample->encodedFile),
+            nullptr);
+
+        if (sample->sourceFile.existsAsFile())
+        {
+            tree.setProperty(
+                "sampleFile",
+                sample->sourceFile.getFullPathName(),
+                nullptr);
+        }
+    }
+
     return tree;
 }
 
@@ -1070,18 +1096,7 @@ juce::ValueTree GaldrAudioProcessor::captureFullState()
         if (auto* p = midiCCMap[cc].load())
             map.appendChild(juce::ValueTree("MAP", { { "cc", cc }, { "param", p->paramID } }), nullptr);
     if (map.getNumChildren() > 0)
-    tree.appendChild(map, nullptr);
-    tree.setProperty("hasSampleState", true, nullptr);
-    if (const auto sample = currentSample();
-    sample != nullptr
-        && sample->isValid()
-        && sample->sourceFile.existsAsFile())
-{
-    tree.setProperty(
-        "sampleFile",
-        sample->sourceFile.getFullPathName(),
-        nullptr);
-}
+        tree.appendChild(map, nullptr);
 
     return tree;
 }
@@ -1101,13 +1116,21 @@ void GaldrAudioProcessor::applyStateTree(juce::ValueTree tree)
 
     migrateState(tree, (int) tree.getProperty("stateVersion", 0));
     const bool restoresSample =
-    (bool) tree.getProperty("hasSampleState", false);
+        (bool) tree.getProperty("hasSampleState", false);
 
     const auto samplePath =
-    tree.getProperty("sampleFile").toString();
+        tree.getProperty("sampleFile").toString();
+
+    const auto sampleName =
+        tree.getProperty("sampleName").toString();
+
+    const auto embeddedSample =
+        tree.getProperty("sampleData");
 
     tree.removeProperty("hasSampleState", nullptr);
     tree.removeProperty("sampleFile", nullptr);
+    tree.removeProperty("sampleName", nullptr);
+    tree.removeProperty("sampleData", nullptr);
     // Restore CC mappings only when the state carries them (host sessions do,
     // preset files don't: loading a sound must not clobber the controller setup).
     if (auto map = tree.getChildWithName("MIDIMAP"); map.isValid())
@@ -1126,28 +1149,41 @@ void GaldrAudioProcessor::applyStateTree(juce::ValueTree tree)
 
     apvts.replaceState(tree);
     if (restoresSample)
-{
-    std::shared_ptr<const dyrekreds::SampleData> restoredSample;
-
-    if (samplePath.isNotEmpty())
     {
-        const auto result =
-            dyrekreds::SampleLoader::load(
-                juce::File(samplePath));
+        std::shared_ptr<const dyrekreds::SampleData> restoredSample;
 
-        if (result)
-            restoredSample = result.sample;
+        if (const auto* data = embeddedSample.getBinaryData();
+            data != nullptr && ! data->isEmpty())
+        {
+            const auto result =
+                dyrekreds::SampleLoader::load(
+                    *data,
+                    sampleName);
+
+            if (result)
+                restoredSample = result.sample;
+        }
+
+        if (restoredSample == nullptr && samplePath.isNotEmpty())
+        {
+            const auto result =
+                dyrekreds::SampleLoader::load(
+                    juce::File(samplePath));
+
+            if (result)
+                restoredSample = result.sample;
+        }
+
+        std::atomic_store_explicit(
+            &sampleData,
+            std::move(restoredSample),
+            std::memory_order_release);
+
+        granularPlayhead.store(
+            0.0f,
+            std::memory_order_relaxed);
     }
 
-    std::atomic_store_explicit(
-        &sampleData,
-        std::move(restoredSample),
-        std::memory_order_release);
-
-    granularPlayhead.store(
-        0.0f,
-        std::memory_order_relaxed);
-}
     const auto tuningData = apvts.state.getProperty("tuningData").toString();
     const auto tuningName = apvts.state.getProperty("tuningName").toString();
     const auto tuningPath = apvts.state.getProperty("tuningFile").toString();

@@ -461,49 +461,94 @@ setParam(processor, pid::grainMotion, 0.0f);
 
     check(processor.currentSample() == sampleBeforeFailure,
           "failed load keeps the current sample");
+
     const auto presetState =
-    processor.capturePresetState();
+        processor.capturePresetState();
+
+    const auto embeddedData =
+        presetState.getProperty("sampleData");
 
     check(
-    ! presetState.hasProperty("sampleFile")
-        && ! presetState.hasProperty("hasSampleState"),
-    "preset state omits the sample file");
+        (bool) presetState.getProperty("hasSampleState", false)
+            && embeddedData.isBinaryData()
+            && embeddedData.getBinaryData() != nullptr
+            && ! embeddedData.getBinaryData()->isEmpty(),
+        "preset embeds the imported sample");
+
+    const auto presetXml =
+        presetState.createXml();
+
+    check(
+        presetXml != nullptr,
+        "embedded sample preset serialises to XML");
+
+    const auto presetRoundTrip =
+        presetXml != nullptr
+            ? juce::ValueTree::fromXml(*presetXml)
+            : juce::ValueTree();
 
     juce::MemoryBlock sessionState;
     processor.getStateInformation(sessionState);
 
+    check(
+        file.deleteFile(),
+        "original WAV is removed before restore");
+
+    GaldrAudioProcessor presetProcessor;
+    presetProcessor.applyStateTree(presetRoundTrip);
+
+    const auto presetSample =
+        presetProcessor.currentSample();
+
+    check(
+        presetSample != nullptr
+            && presetSample->isValid(),
+        "preset restores the embedded sample without the original file");
+
+    if (presetSample != nullptr)
+    {
+        check(
+            presetSample->name
+                == file.getFileNameWithoutExtension(),
+            "preset restores the embedded sample name");
+
+        check(
+            presetSample->audio.getNumSamples()
+                == numSamples,
+            "preset restores the embedded sample audio");
+    }
+
     GaldrAudioProcessor restoredProcessor;
 
     restoredProcessor.setStateInformation(
-    sessionState.getData(),
-    (int) sessionState.getSize());
+        sessionState.getData(),
+        (int) sessionState.getSize());
 
     const auto restoredSample =
-    restoredProcessor.currentSample();
+        restoredProcessor.currentSample();
 
     check(
-    restoredSample != nullptr
-        && restoredSample->isValid(),
-    "host state restores the loaded sample");
+        restoredSample != nullptr
+            && restoredSample->isValid(),
+        "host state restores the embedded sample");
 
     if (restoredSample != nullptr)
-{
-    check(
-        restoredSample->sourceFile == file,
-        "host state restores the sample path");
+    {
+        check(
+            restoredSample->audio.getNumSamples()
+                == numSamples,
+            "host state restores embedded sample audio");
+    }
 
-    check(
-        restoredSample->audio.getNumSamples()
-            == numSamples,
-        "host state restores the sample audio");
-}
     processor.clearSample();
 
-    check(processor.currentSample() == nullptr,
-          "sample can be cleared");
+    check(
+        processor.currentSample() == nullptr,
+        "sample can be cleared");
 
-    check(file.deleteFile(),
-          "temporary WAV is removed");
+    check(
+        ! file.existsAsFile(),
+        "temporary WAV remains removed");
 }
 void testStateRoundTrip()
 {
