@@ -12,13 +12,13 @@ application. Development began on 21 August 2026.
 
 ## Project status
 
-Dyrekreds is in early development. The initial version establishes a separate
-product identity, manufacturer identity, plugin IDs and user preset directory,
-allowing Dyrekreds and Galdr to be installed side by side.
+Dyrekreds 0.9 is a public beta. The plugin is functional and tested
+automatically on Linux, Windows and macOS, but additional testing across DAWs,
+hardware and real-world projects is welcome before the 1.0 release.
 
-The current sound engine, factory presets and much of the interface originate
-from Galdr. Future Dyrekreds releases will introduce substantial interface,
-sound-engine and workflow changes.
+Dyrekreds is derived from Galdr, while establishing its own product identity,
+plugin IDs, preset directory and expanding sound engine. Dyrekreds and Galdr
+can be installed side by side.
 
 ## Features
 
@@ -31,11 +31,14 @@ sound-engine and workflow changes.
 - Tempo-synchronised arpeggiator, LFOs, tremolo and delay
 - MPE-friendly pitch bend and pressure
 - Scala `.scl` microtuning
+- WAV and AIFF sample import with pitch-tracked playback
+- Granular and freeze modes with five grain-motion patterns
+- Interactive sample waveform with realtime playhead and scrubbing
 - Distortion, bitcrusher, ring modulation, chorus, delay and reverb
 - Granular “Blizzard” texture layer
 - Preset browser with 27 factory presets inherited from Galdr
 - MIDI learn, undo and redo
-- Oscilloscope, spectrum analyser and on-screen keyboard
+- Sample waveform, spectrum analyser and on-screen keyboard
 - Resizable dark-fantasy interface
 
 ## Building
