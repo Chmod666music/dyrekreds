@@ -396,7 +396,42 @@ void testSampleLoading()
 
     check(processor.currentSample() == sampleBeforeFailure,
           "failed load keeps the current sample");
+    const auto presetState =
+    processor.capturePresetState();
 
+    check(
+    ! presetState.hasProperty("sampleFile")
+        && ! presetState.hasProperty("hasSampleState"),
+    "preset state omits the sample file");
+
+    juce::MemoryBlock sessionState;
+    processor.getStateInformation(sessionState);
+
+    GaldrAudioProcessor restoredProcessor;
+
+    restoredProcessor.setStateInformation(
+    sessionState.getData(),
+    (int) sessionState.getSize());
+
+    const auto restoredSample =
+    restoredProcessor.currentSample();
+
+    check(
+    restoredSample != nullptr
+        && restoredSample->isValid(),
+    "host state restores the loaded sample");
+
+    if (restoredSample != nullptr)
+{
+    check(
+        restoredSample->sourceFile == file,
+        "host state restores the sample path");
+
+    check(
+        restoredSample->audio.getNumSamples()
+            == numSamples,
+        "host state restores the sample audio");
+}
     processor.clearSample();
 
     check(processor.currentSample() == nullptr,

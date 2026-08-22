@@ -59,7 +59,7 @@ public:
     // Versioned state. captureFullState is what the host stores; preset files
     // use capturePresetState (no MIDI map: controller setup is not a sound).
     // applyStateTree migrates old versions and restores tuning and mappings.
-    static constexpr int stateVersion = 1;
+    static constexpr int stateVersion = 2;
     juce::ValueTree captureFullState();
     juce::ValueTree capturePresetState();
     void applyStateTree(juce::ValueTree tree);

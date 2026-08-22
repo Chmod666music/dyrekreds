@@ -1070,7 +1070,19 @@ juce::ValueTree GaldrAudioProcessor::captureFullState()
         if (auto* p = midiCCMap[cc].load())
             map.appendChild(juce::ValueTree("MAP", { { "cc", cc }, { "param", p->paramID } }), nullptr);
     if (map.getNumChildren() > 0)
-        tree.appendChild(map, nullptr);
+    tree.appendChild(map, nullptr);
+    tree.setProperty("hasSampleState", true, nullptr);
+    if (const auto sample = currentSample();
+    sample != nullptr
+        && sample->isValid()
+        && sample->sourceFile.existsAsFile())
+{
+    tree.setProperty(
+        "sampleFile",
+        sample->sourceFile.getFullPathName(),
+        nullptr);
+}
+
     return tree;
 }
 
@@ -1088,7 +1100,14 @@ void GaldrAudioProcessor::applyStateTree(juce::ValueTree tree)
         return;
 
     migrateState(tree, (int) tree.getProperty("stateVersion", 0));
+    const bool restoresSample =
+    (bool) tree.getProperty("hasSampleState", false);
 
+    const auto samplePath =
+    tree.getProperty("sampleFile").toString();
+
+    tree.removeProperty("hasSampleState", nullptr);
+    tree.removeProperty("sampleFile", nullptr);
     // Restore CC mappings only when the state carries them (host sessions do,
     // preset files don't: loading a sound must not clobber the controller setup).
     if (auto map = tree.getChildWithName("MIDIMAP"); map.isValid())
@@ -1106,7 +1125,29 @@ void GaldrAudioProcessor::applyStateTree(juce::ValueTree tree)
     midiLearnTarget.store(nullptr);
 
     apvts.replaceState(tree);
+    if (restoresSample)
+{
+    std::shared_ptr<const dyrekreds::SampleData> restoredSample;
 
+    if (samplePath.isNotEmpty())
+    {
+        const auto result =
+            dyrekreds::SampleLoader::load(
+                juce::File(samplePath));
+
+        if (result)
+            restoredSample = result.sample;
+    }
+
+    std::atomic_store_explicit(
+        &sampleData,
+        std::move(restoredSample),
+        std::memory_order_release);
+
+    granularPlayhead.store(
+        0.0f,
+        std::memory_order_relaxed);
+}
     const auto tuningData = apvts.state.getProperty("tuningData").toString();
     const auto tuningName = apvts.state.getProperty("tuningName").toString();
     const auto tuningPath = apvts.state.getProperty("tuningFile").toString();
