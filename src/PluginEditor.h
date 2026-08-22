@@ -81,6 +81,7 @@ private:
 
     juce::MidiKeyboardComponent keyboard;
     galdr::ScopeComponent scope;
+    galdr::SampleWaveformComponent sampleWaveform;
     galdr::SpectrumComponent spectrum;
 
     juce::TextButton presetPrev { "<" }, presetNext { ">" };

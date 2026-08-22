@@ -57,7 +57,10 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
       processorRef(p),
       keyboard(p.keyboardState, juce::MidiKeyboardComponent::horizontalKeyboard),
       scope(p.scopeFifo),
-      spectrum(p.spectrumFifo, [&p] { return p.getSampleRate(); })
+    sampleWaveform(
+    [&p] { return p.currentSample(); },
+    [&p] { return p.getGranularPlayhead(); }),
+    spectrum(p.spectrumFifo, [&p] { return p.getSampleRate(); })
 {
     sections.reserve(24);
 
@@ -267,6 +270,8 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
     {
     auto& s = addSection("Granular", { 320, 780, 300, 148 });
 
+    addCombo(comboRow(s), pid::grainMotion);
+
     auto& r = knobRow(s);
     addKnob(r, pid::grainSize, "Size");
     addKnob(r, pid::grainDensity, "Density");
@@ -276,7 +281,7 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
 }
 }
 
-    addCustomSection("Oscilloscope", { 628, 780, 280, 148 }, scope);
+    addCustomSection("Sample", { 628, 780, 280, 148 }, sampleWaveform);
     addCustomSection("Spectrum", { 916, 780, 292, 148 }, spectrum);
 
     // ---- preset browser and header controls

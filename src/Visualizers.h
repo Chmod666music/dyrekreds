@@ -8,6 +8,7 @@
 #include <array>
 #include <functional>
 #include "BlackMetalLookAndFeel.h"
+#include "SampleData.h"
 
 namespace galdr
 {
@@ -210,4 +211,177 @@ private:
     int ringPos = 0;
 };
 
+    class SampleWaveformComponent : public juce::Component,
+                                private juce::Timer
+{
+    public:
+    using SampleProvider =
+    std::function<std::shared_ptr<const dyrekreds::SampleData>()>;
+
+    using PlayheadProvider =
+    std::function<float()>;
+
+    SampleWaveformComponent(
+    SampleProvider sampleProvider,
+    PlayheadProvider playheadProvider)
+    : getSample(std::move(sampleProvider)),
+      getPlayhead(std::move(playheadProvider))
+    {
+        setInterceptsMouseClicks(false, false);
+        startTimerHz(12);
+    }
+
+    private:
+    void timerCallback() override
+{
+    const auto sample = getSample();
+
+    if (sample != displayedSample)
+    {
+        displayedSample = sample;
+        waveform.clear();
+
+        if (sample != nullptr && sample->isValid())
+            buildWaveform(*sample);
+    }
+
+    playhead = juce::jlimit(
+        0.0f,
+        1.0f,
+        getPlayhead());
+
+    repaint();
+}
+
+    void buildWaveform(const dyrekreds::SampleData& sample)
+    {
+        constexpr int points = 512;
+        const int sampleCount = sample.audio.getNumSamples();
+        const int channels = sample.audio.getNumChannels();
+
+        waveform.reserve(points);
+
+        for (int point = 0; point < points; ++point)
+        {
+            const int start =
+                point * sampleCount / points;
+
+            const int end =
+                juce::jmax(
+                    start + 1,
+                    (point + 1) * sampleCount / points);
+
+            float peak = 0.0f;
+
+            for (int channel = 0; channel < channels; ++channel)
+            {
+                const auto range =
+                    sample.audio.findMinMax(
+                        channel,
+                        start,
+                        juce::jmin(sampleCount, end) - start);
+
+                peak = juce::jmax(
+                    peak,
+                    std::abs(range.getStart()),
+                    std::abs(range.getEnd()));
+            }
+
+            waveform.push_back(peak);
+        }
+    }
+
+    void paint(juce::Graphics& g) override
+    {
+        auto bounds =
+            getLocalBounds().toFloat().reduced(1.0f);
+
+        g.setColour(juce::Colour(0xe60a1218));
+        g.fillRect(bounds);
+
+        g.setColour(theme::outline.withAlpha(0.6f));
+        g.drawRect(bounds, 1.0f);
+
+        g.setColour(theme::boneDim.withAlpha(0.18f));
+        g.drawLine(
+            bounds.getX(),
+            bounds.getCentreY(),
+            bounds.getRight(),
+            bounds.getCentreY(),
+            1.0f);
+
+        if (waveform.empty())
+        {
+            g.setFont(12.0f);
+            g.setColour(theme::boneDim.withAlpha(0.55f));
+            g.drawText(
+                "NO SAMPLE LOADED",
+                getLocalBounds(),
+                juce::Justification::centred);
+
+            return;
+        }
+
+        juce::Path path;
+        const float centreY = bounds.getCentreY();
+        const float halfHeight = bounds.getHeight() * 0.43f;
+
+        for (size_t i = 0; i < waveform.size(); ++i)
+        {
+            const float x =
+                juce::jmap(
+                    (float) i,
+                    0.0f,
+                    (float) (waveform.size() - 1),
+                    bounds.getX(),
+                    bounds.getRight());
+
+            const float height = waveform[i] * halfHeight;
+
+            path.startNewSubPath(x, centreY - height);
+            path.lineTo(x, centreY + height);
+        }
+
+        g.setColour(theme::blood.withAlpha(0.35f));
+        g.strokePath(path, juce::PathStrokeType(3.0f));
+
+        g.setColour(theme::bloodBright.withAlpha(0.90f));
+        g.strokePath(path, juce::PathStrokeType(1.0f));
+        const float playheadX =
+    bounds.getX() + playhead * bounds.getWidth();
+
+    g.setColour(theme::blood.withAlpha(0.30f));
+    g.drawLine(
+    playheadX,
+    bounds.getY(),
+    playheadX,
+    bounds.getBottom(),
+    4.0f);
+
+    g.setColour(theme::bloodBright);
+    g.drawLine(
+    playheadX,
+    bounds.getY(),
+    playheadX,
+    bounds.getBottom(),
+    1.25f);
+
+    juce::Path marker;
+    marker.addTriangle(
+    playheadX - 4.0f,
+    bounds.getY(),
+    playheadX + 4.0f,
+    bounds.getY(),
+    playheadX,
+    bounds.getY() + 6.0f);
+
+    g.fillPath(marker);
+    }
+
+    SampleProvider getSample;
+    PlayheadProvider getPlayhead;
+    std::shared_ptr<const dyrekreds::SampleData> displayedSample;
+    std::vector<float> waveform;
+    float playhead = 0.0f;
+};
 } // namespace galdr

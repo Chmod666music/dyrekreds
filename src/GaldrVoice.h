@@ -56,6 +56,7 @@ public:
         int sampleMode = 0;
         float sampleLvl = 0.7f;
         int sampleRoot = 60;
+        int grainMotion = 0;
         float grainSize = 0.08f;
         float grainDensity = 12.0f;
         float grainPosition = 0.0f;
@@ -81,6 +82,7 @@ public:
         float modWheel = 0.0f, globalPressure = 0.0f;
 
         std::atomic<juce::uint32>* noteCounter = nullptr;
+        std::atomic<float>* granularPlayhead = nullptr;
     };
 
     explicit GaldrVoice(const Settings& s) : settings(s) {}
@@ -124,7 +126,9 @@ public:
             : nullptr;
         samplePosition = 0.0;
         grainScanPosition = 0.0;
+        grainScanDirection = 1.0;
         samplesUntilNextGrain = 0.0;
+
 
         if (voiceSample != nullptr && voiceSample->isValid())
 {
@@ -405,6 +409,25 @@ for (auto& grain : grains)
                 break;
             }
         }
+        if (settings.granularPlayhead != nullptr
+            && voiceSample != nullptr
+            && voiceSample->isValid()
+            && settings.sampleMode != 0)
+        {
+            const double maximumPosition =
+                (double) juce::jmax(
+                    1,
+                    voiceSample->audio.getNumSamples() - 1);
+
+            const float playhead =
+                settings.sampleMode == 2
+                    ? settings.grainPosition
+                    : (float) (grainScanPosition / maximumPosition);
+
+            settings.granularPlayhead->store(
+                juce::jlimit(0.0f, 1.0f, playhead),
+                std::memory_order_relaxed);
+        }
 
         if (output.getNumChannels() >= 2)
         {
@@ -571,6 +594,7 @@ private:
     std::shared_ptr<const dyrekreds::SampleData> voiceSample;
     double samplePosition = 0.0;
     double grainScanPosition = 0.0;
+    double grainScanDirection = 1.0;
     std::array<Grain, maximumGrains> grains {};
     double samplesUntilNextGrain = 0.0;
 
@@ -599,7 +623,26 @@ private:
     const bool frozen =
     settings.sampleMode == 2;
 
-    const double centre =
+    if (! frozen && settings.grainMotion == 1)
+{
+    grainScanPosition =
+        rng.nextDouble() * (double) maximumStart;
+}
+    else if (! frozen && settings.grainMotion == 2)
+{
+    grainScanDirection =
+        juce::jlimit(
+            -1.0,
+            1.0,
+            grainScanDirection
+                + (rng.nextDouble() * 2.0 - 1.0) * 0.35);
+
+    if (std::abs(grainScanDirection) < 0.12)
+        grainScanDirection =
+            grainScanDirection < 0.0 ? -0.12 : 0.12;
+}
+
+const double centre =
     frozen
         ? settings.grainPosition * (double) maximumStart
         : juce::jlimit(
@@ -711,13 +754,13 @@ private:
             * normalisation
             * window;
 
-       const float pan =
-    juce::jlimit(-1.0f, 1.0f, grain.pan);
+        const float pan =
+            juce::jlimit(-1.0f, 1.0f, grain.pan);
 
         const float panAngle =
-        (pan + 1.0f)
-        * juce::MathConstants<float>::pi
-        * 0.25f;
+            (pan + 1.0f)
+            * juce::MathConstants<float>::pi
+            * 0.25f;
 
         const float leftGain =
             std::cos(panAngle)
@@ -730,21 +773,83 @@ private:
         left += readChannel(0) * gain * leftGain;
         right += readChannel(rightChannel) * gain * rightGain;
 
-                grain.position += grain.increment;
+        grain.position += grain.increment;
         ++grain.age;
     }
 
     if (settings.sampleMode == 1 && sampleCount > 1)
     {
-        grainScanPosition += increment;
-
         const double scanLength =
             (double) (sampleCount - 1);
 
-        if (grainScanPosition >= scanLength)
+        switch (settings.grainMotion)
         {
-            grainScanPosition =
-                std::fmod(grainScanPosition, scanLength);
+            case 1: // Random: position changes when each grain starts.
+                break;
+
+            case 2: // Drift
+                grainScanPosition +=
+                    increment * grainScanDirection;
+
+                if (grainScanPosition >= scanLength)
+                {
+                    grainScanPosition =
+                        scanLength
+                        - (grainScanPosition - scanLength);
+
+                    grainScanDirection =
+                        -std::abs(grainScanDirection);
+                }
+                else if (grainScanPosition < 0.0)
+                {
+                    grainScanPosition =
+                        -grainScanPosition;
+
+                    grainScanDirection =
+                        std::abs(grainScanDirection);
+                }
+                break;
+
+            case 3: // Reverse
+                grainScanPosition -= increment;
+
+                if (grainScanPosition < 0.0)
+                    grainScanPosition += scanLength;
+                break;
+
+            case 4: // Bounce
+                grainScanPosition +=
+                    increment * grainScanDirection;
+
+                if (grainScanPosition >= scanLength)
+                {
+                    grainScanPosition =
+                        scanLength
+                        - (grainScanPosition - scanLength);
+
+                    grainScanDirection = -1.0;
+                }
+                else if (grainScanPosition < 0.0)
+                {
+                    grainScanPosition =
+                        -grainScanPosition;
+
+                    grainScanDirection = 1.0;
+                }
+                break;
+
+            case 0: // Forward
+            default:
+                grainScanPosition += increment;
+
+                if (grainScanPosition >= scanLength)
+                {
+                    grainScanPosition =
+                        std::fmod(
+                            grainScanPosition,
+                            scanLength);
+                }
+                break;
         }
     }
 }

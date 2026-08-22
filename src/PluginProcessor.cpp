@@ -32,6 +32,7 @@ GaldrAudioProcessor::GaldrAudioProcessor()
     settings.noteFreqs = tuning.freqs;
     settings.noteCounter = &noteSerial;
     settings.sampleSource = &sampleData;
+    settings.granularPlayhead = &granularPlayhead;
 
     for (int i = 0; i < numVoices; ++i)
         synth.addVoice(new GaldrVoice(settings));
@@ -251,6 +252,18 @@ juce::AudioProcessorValueTreeState::ParameterLayout createGaldrParameterLayout()
         127,
         60,
         midiNote));
+
+    add(std::make_unique<AudioParameterChoice>(
+    ParameterID { pid::grainMotion, 1 },
+    "Grain Motion",
+    StringArray {
+        "Forward",
+        "Random",
+        "Drift",
+        "Reverse",
+        "Bounce"
+    },
+    0));
 
     add(std::make_unique<AudioParameterFloat>(
         ParameterID { pid::grainSize, 1 },
@@ -517,6 +530,7 @@ void GaldrAudioProcessor::updateSettings(int numSamples)
     settings.sampleMode     = (int) raw(pid::sampleMode);
     settings.sampleLvl      = raw(pid::sampleLvl);
     settings.sampleRoot     = (int) raw(pid::sampleRoot);
+    settings.grainMotion    = (int) raw(pid::grainMotion);
     settings.grainSize      = raw(pid::grainSize);
     settings.grainDensity   = raw(pid::grainDensity);
     settings.grainPosition  = raw(pid::grainPosition);

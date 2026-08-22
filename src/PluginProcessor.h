@@ -51,6 +51,10 @@ public:
     void clearSample();
     std::shared_ptr<const dyrekreds::SampleData> currentSample() const;
     juce::String getSampleName() const;
+    float getGranularPlayhead() const noexcept
+{
+    return granularPlayhead.load(std::memory_order_relaxed);
+}
 
     // Versioned state. captureFullState is what the host stores; preset files
     // use capturePresetState (no MIDI map: controller setup is not a sound).
@@ -94,6 +98,7 @@ private:
     GaldrVoice::Settings settings;
     galdr::Tuning tuning;
     std::shared_ptr<const dyrekreds::SampleData> sampleData;
+    std::atomic<float> granularPlayhead { 0.0f };
 
     // MIDI CC -> parameter map, written on the message thread, read per block.
     std::atomic<juce::RangedAudioParameter*> midiCCMap[128] {};
