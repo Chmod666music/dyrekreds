@@ -470,7 +470,7 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
     setLookAndFeel(nullptr);
 }
 
-void GaldrAudioProcessorEditor::timerCallback()
+    void GaldrAudioProcessorEditor::timerCallback()
 {
     // Group the parameter edits since the last tick into one undoable step.
     processorRef.undoManager.beginNewTransaction();
@@ -485,6 +485,36 @@ void GaldrAudioProcessorEditor::timerCallback()
     presetNameButton.setButtonText(name);
 
     tuningButton.setButtonText(processorRef.getTuningName());
+    const auto* sampleMode =
+    processorRef.apvts.getRawParameterValue(pid::sampleMode);
+
+    const bool granularEnabled =
+    sampleMode != nullptr && sampleMode->load() >= 0.5f;
+
+    for (auto& section : sections)
+{
+    if (section.title != "Granular")
+        continue;
+
+    if (section.enabled == granularEnabled)
+        break;
+
+    section.enabled = granularEnabled;
+
+    for (auto& row : section.rows)
+    {
+        for (auto* component : row.comps)
+            if (component != nullptr)
+                component->setEnabled(granularEnabled);
+
+        for (auto* label : row.labels)
+            if (label != nullptr)
+                label->setEnabled(granularEnabled);
+    }
+
+    repaint(section.bounds);
+    break;
+}
 }
 
 bool GaldrAudioProcessorEditor::keyPressed(const juce::KeyPress& key)
@@ -797,14 +827,20 @@ void GaldrAudioProcessorEditor::paint(juce::Graphics& g)
 
     // section panels
     for (const auto& s : sections)
-    {
-        auto b = s.bounds;
+{
+    const juce::Graphics::ScopedSaveState state(g);
+    g.setOpacity(s.enabled ? 1.0f : 0.34f);
 
-juce::ColourGradient stone(
-    theme::panel.brighter(0.08f).withAlpha(0.84f),
-    (float) b.getX(), (float) b.getY(),
-    theme::iron.darker(0.12f).withAlpha(0.92f),
-    (float) b.getX(), (float) b.getBottom(), false);
+    auto b = s.bounds;
+
+    juce::ColourGradient stone(
+        theme::panel.brighter(0.08f).withAlpha(0.84f),
+        (float) b.getX(),
+        (float) b.getY(),
+        theme::iron.darker(0.12f).withAlpha(0.92f),
+        (float) b.getX(),
+        (float) b.getBottom(),
+        false);
 
     g.setGradientFill(stone);
     g.fillRect(b);
@@ -816,25 +852,28 @@ juce::ColourGradient stone(
     g.drawRect(b.reduced(sc(2)), 1);
 
     g.setColour(theme::outline.withAlpha(0.28f));
-    g.drawHorizontalLine(b.getY() + 1,
-                     (float) b.getX() + sc(2),
-                     (float) b.getRight() - sc(2));
+    g.drawHorizontalLine(
+        b.getY() + 1,
+        (float) b.getX() + sc(2),
+        (float) b.getRight() - sc(2));
 
-                g.setFont(lnf.getBodyFont(15.0f * scale));
-        g.setColour(theme::bone.withAlpha(0.76f));
-        g.drawText(s.title,
-                   b.getX() + sc(8),
-                   b.getY() + 2,
-                   b.getWidth() - sc(16),
-                   sc(16),
-                   juce::Justification::centredLeft);
+    g.setFont(lnf.getBodyFont(15.0f * scale));
+    g.setColour(theme::bone.withAlpha(0.76f));
+    g.drawText(
+        s.title,
+        b.getX() + sc(8),
+        b.getY() + 2,
+        b.getWidth() - sc(16),
+        sc(16),
+        juce::Justification::centredLeft);
 
-        g.setColour(theme::bloodBright.withAlpha(0.60f));
-        g.fillRect((float) b.getX() + 8.0f * scale,
-                   (float) b.getY() + 18.0f * scale,
-                   24.0f * scale,
-                   1.5f);
-    }
+    g.setColour(theme::bloodBright.withAlpha(0.60f));
+    g.fillRect(
+        (float) b.getX() + 8.0f * scale,
+        (float) b.getY() + 18.0f * scale,
+        24.0f * scale,
+        1.5f);
+}
 
     // outer frame and corner brackets
     g.setColour(theme::outline);

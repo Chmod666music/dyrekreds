@@ -51,13 +51,14 @@ private:
     };
 
     struct Section
-    {
-        juce::String title;
-        juce::Rectangle<int> baseBounds;        // layout at reference size
-        juce::Rectangle<int> bounds;            // scaled, set in resized()
-        std::vector<Row> rows;
-        juce::Component* custom = nullptr;      // fills the body instead of rows
-    };
+{
+    juce::String title;
+    juce::Rectangle<int> baseBounds;       // layout at reference size
+    juce::Rectangle<int> bounds;           // scaled, set in resized()
+    std::vector<Row> rows;
+    juce::Component* custom = nullptr;     // fills the body instead of rows
+    bool enabled = true;
+};
 
     Section& addSection(const juce::String& title, juce::Rectangle<int> baseBounds);
     Section& addCustomSection(const juce::String& title, juce::Rectangle<int> baseBounds,
