@@ -127,6 +127,7 @@ public:
         samplePosition = 0.0;
         grainScanPosition = 0.0;
         grainScanDirection = 1.0;
+        lastGrainPosition = settings.grainPosition;
         samplesUntilNextGrain = 0.0;
 
 
@@ -220,7 +221,25 @@ for (auto& grain : grains)
         const float sr = (float) getSampleRate();
         updateFilterType();
         computeMods();
+    if (settings.sampleMode == 1
+    && settings.grainMotion != 1
+    && voiceSample != nullptr
+    && voiceSample->isValid()
+    && std::abs(settings.grainPosition
+                - lastGrainPosition) > 0.0001f)
+{
+    const int maximumStart =
+        juce::jmax(
+            0,
+            voiceSample->audio.getNumSamples() - 2);
 
+    grainScanPosition =
+        settings.grainPosition
+        * (double) maximumStart;
+
+    lastGrainPosition =
+        settings.grainPosition;
+}
         const float glideCoeff = settings.glideSeconds > 0.0001f
                                      ? std::exp(-1.0f / (settings.glideSeconds * sr))
                                      : 0.0f;
@@ -595,6 +614,7 @@ private:
     double samplePosition = 0.0;
     double grainScanPosition = 0.0;
     double grainScanDirection = 1.0;
+    float lastGrainPosition = 0.0f;
     std::array<Grain, maximumGrains> grains {};
     double samplesUntilNextGrain = 0.0;
 

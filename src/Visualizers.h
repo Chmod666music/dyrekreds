@@ -223,13 +223,17 @@ private:
 
     SampleWaveformComponent(
     SampleProvider sampleProvider,
-    PlayheadProvider playheadProvider)
+    PlayheadProvider playheadProvider,
+    juce::RangedAudioParameter& position,
+    juce::RangedAudioParameter& spread)
     : getSample(std::move(sampleProvider)),
-      getPlayhead(std::move(playheadProvider))
-    {
-        setInterceptsMouseClicks(false, false);
-        startTimerHz(12);
-    }
+      getPlayhead(std::move(playheadProvider)),
+      positionParameter(position),
+      spreadParameter(spread)
+{
+    setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
+    startTimerHz(30);
+}
 
     private:
     void timerCallback() override
@@ -246,9 +250,14 @@ private:
     }
 
     playhead = juce::jlimit(
-        0.0f,
-        1.0f,
-        getPlayhead());
+    0.0f,
+    1.0f,
+    getPlayhead());
+
+    spread = juce::jlimit(
+    0.0f,
+    1.0f,
+    spreadParameter.getValue());
 
     repaint();
 }
@@ -321,6 +330,43 @@ private:
 
             return;
         }
+    const float spreadStart =
+    juce::jlimit(
+        0.0f,
+        1.0f,
+        playhead - spread);
+
+    const float spreadEnd =
+    juce::jlimit(
+        0.0f,
+        1.0f,
+        playhead + spread);
+
+    const float spreadX =
+    bounds.getX()
+    + spreadStart * bounds.getWidth();
+
+    const float spreadWidth =
+    (spreadEnd - spreadStart)
+    * bounds.getWidth();
+
+    g.setColour(theme::blood.withAlpha(0.14f));
+    g.fillRect(
+    spreadX,
+    bounds.getY(),
+    spreadWidth,
+    bounds.getHeight());
+
+    g.setColour(theme::bloodBright.withAlpha(0.32f));
+    g.drawVerticalLine(
+    juce::roundToInt(spreadX),
+    bounds.getY(),
+    bounds.getBottom());
+
+    g.drawVerticalLine(
+    juce::roundToInt(spreadX + spreadWidth),
+    bounds.getY(),
+    bounds.getBottom());
 
         juce::Path path;
         const float centreY = bounds.getCentreY();
@@ -377,11 +423,50 @@ private:
 
     g.fillPath(marker);
     }
+    void mouseDown(const juce::MouseEvent& event) override
+{
+    if (displayedSample == nullptr)
+        return;
 
+    positionParameter.beginChangeGesture();
+    updatePositionFromMouse(event.x);
+}
+
+    void mouseDrag(const juce::MouseEvent& event) override
+{
+    if (displayedSample == nullptr)
+        return;
+
+    updatePositionFromMouse(event.x);
+}
+
+    void mouseUp(const juce::MouseEvent&) override
+{
+    if (displayedSample != nullptr)
+        positionParameter.endChangeGesture();
+}
+
+    void updatePositionFromMouse(int mouseX)
+{
+    const auto bounds =
+        getLocalBounds().toFloat().reduced(1.0f);
+
+    const float normalised =
+        juce::jlimit(
+            0.0f,
+            1.0f,
+            ((float) mouseX - bounds.getX())
+                / juce::jmax(1.0f, bounds.getWidth()));
+
+    positionParameter.setValueNotifyingHost(normalised);
+}
     SampleProvider getSample;
     PlayheadProvider getPlayhead;
+    juce::RangedAudioParameter& positionParameter;
+    juce::RangedAudioParameter& spreadParameter;
     std::shared_ptr<const dyrekreds::SampleData> displayedSample;
     std::vector<float> waveform;
     float playhead = 0.0f;
+    float spread = 0.0f;
 };
 } // namespace galdr
