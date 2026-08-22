@@ -79,6 +79,52 @@ std::vector<float> render(GaldrAudioProcessor& p, double sr, int blockSize, doub
     }
     return out;
 }
+    struct StereoRender
+{
+    std::vector<float> left;
+    std::vector<float> right;
+};
+
+    StereoRender renderStereo(
+    GaldrAudioProcessor& p,
+    double sr,
+    int blockSize,
+    double seconds,
+    const std::vector<Event>& events)
+{
+    const int total =
+        ((int) std::ceil(seconds * sr / blockSize)) * blockSize;
+
+    StereoRender out;
+    out.left.reserve((size_t) total);
+    out.right.reserve((size_t) total);
+
+    juce::AudioBuffer<float> buffer(
+        juce::jmax(2, p.getTotalNumOutputChannels()),
+        blockSize);
+
+    for (int pos = 0; pos < total; pos += blockSize)
+    {
+        juce::MidiBuffer midi;
+
+        for (const auto& event : events)
+            if (event.sample >= pos
+                && event.sample < pos + blockSize)
+            {
+                midi.addEvent(event.msg, event.sample - pos);
+            }
+
+        p.processBlock(buffer, midi);
+
+        for (int i = 0; i < blockSize; ++i)
+        {
+            out.left.push_back(buffer.getSample(0, i));
+            out.right.push_back(buffer.getSample(1, i));
+        }
+    }
+
+    return out;
+}
 
 float peakIn(const std::vector<float>& v, double sr, double t0, double t1)
 {
@@ -263,6 +309,47 @@ void testSampleLoading()
           " (worst "
           + juce::String(granularWorst, 4)
           + ")");
+    setParam(processor, pid::grainDensity, 80.0f);
+    setParam(processor, pid::grainStereo, 1.0f);
+
+    const auto stereoGranularRender =
+    renderStereo(
+        processor,
+        sampleRate,
+        128,
+        0.12,
+        sampleEvents);
+
+    float stereoDifference = 0.0f;
+
+    const int stereoStart =
+    juce::jlimit(
+        0,
+        (int) stereoGranularRender.left.size(),
+        (int) (0.005 * sampleRate));
+
+    const int stereoEnd =
+    juce::jlimit(
+        0,
+        (int) stereoGranularRender.left.size(),
+        (int) (0.09 * sampleRate));
+
+    for (int i = stereoStart; i < stereoEnd; ++i)
+{
+    stereoDifference =
+        juce::jmax(
+            stereoDifference,
+            std::abs(
+                stereoGranularRender.left[(size_t) i]
+                - stereoGranularRender.right[(size_t) i]));
+}
+
+    check(
+    stereoDifference > 0.001f,
+    "granular stereo spread separates left and right"
+        " (difference "
+        + juce::String(stereoDifference, 4)
+        + ")");
 
     setParam(processor, pid::sampleLvl, 0.0f);
 

@@ -264,6 +264,7 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
     addKnob(r, pid::bzLvl, "Level");
 }
 {
+    {
     auto& s = addSection("Granular", { 320, 780, 300, 148 });
 
     auto& r = knobRow(s);
@@ -271,6 +272,8 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
     addKnob(r, pid::grainDensity, "Density");
     addKnob(r, pid::grainPosition, "Position");
     addKnob(r, pid::grainSpread, "Spread");
+    addKnob(r, pid::grainStereo, "Stereo");
+}
 }
 
     addCustomSection("Oscilloscope", { 628, 780, 280, 148 }, scope);

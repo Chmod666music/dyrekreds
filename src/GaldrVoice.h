@@ -60,6 +60,7 @@ public:
         float grainDensity = 12.0f;
         float grainPosition = 0.0f;
         float grainSpread = 0.25f;
+        float grainStereo = 0.0f;
 
         int   filterType = 0;
         float cutoff = 12000.0f, resonance = 0.2f, filterDrive = 0.0f;
@@ -603,7 +604,10 @@ private:
             2,
             juce::roundToInt(
                 settings.grainSize * getSampleRate()));
-    available->pan = 0.0f;
+    available->pan =
+    (rng.nextFloat() * 2.0f - 1.0f)
+    * settings.grainStereo;
+
     available->active = true;
 }
 
@@ -686,8 +690,24 @@ private:
             * normalisation
             * window;
 
-        left += readChannel(0) * gain;
-        right += readChannel(rightChannel) * gain;
+       const float pan =
+    juce::jlimit(-1.0f, 1.0f, grain.pan);
+
+        const float panAngle =
+        (pan + 1.0f)
+        * juce::MathConstants<float>::pi
+        * 0.25f;
+
+        const float leftGain =
+            std::cos(panAngle)
+            * juce::MathConstants<float>::sqrt2;
+
+        const float rightGain =
+            std::sin(panAngle)
+            * juce::MathConstants<float>::sqrt2;
+
+        left += readChannel(0) * gain * leftGain;
+        right += readChannel(rightChannel) * gain * rightGain;
 
         grain.position += grain.increment;
         ++grain.age;

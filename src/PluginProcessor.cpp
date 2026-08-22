@@ -279,6 +279,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout createGaldrParameterLayout()
         zeroOne,
         0.25f,
         percent));
+    add(std::make_unique<AudioParameterFloat>(
+        ParameterID { pid::grainStereo, 1 },
+        "Grain Stereo Spread",
+        zeroOne,
+        0.0f,
+        percent));
 
     // FILTER
 
@@ -515,6 +521,7 @@ void GaldrAudioProcessor::updateSettings(int numSamples)
     settings.grainDensity   = raw(pid::grainDensity);
     settings.grainPosition  = raw(pid::grainPosition);
     settings.grainSpread    = raw(pid::grainSpread);
+    settings.grainStereo    = raw(pid::grainStereo);
 
     settings.filterType  = (int) raw(pid::filterType);
     settings.cutoff      = raw(pid::cutoff);

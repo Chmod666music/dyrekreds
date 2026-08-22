@@ -40,6 +40,7 @@ namespace pid
     inline constexpr auto grainDensity  = "grainDensity";
     inline constexpr auto grainPosition = "grainPosition";
     inline constexpr auto grainSpread   = "grainSpread";
+    inline constexpr auto grainStereo   = "grainStereo";
 
     // filter
     inline constexpr auto filterType  = "filterType";
