@@ -123,10 +123,22 @@ public:
                                         std::memory_order_acquire)
             : nullptr;
         samplePosition = 0.0;
+        grainScanPosition = 0.0;
         samplesUntilNextGrain = 0.0;
 
-        for (auto& grain : grains)
-            grain = {};
+        if (voiceSample != nullptr && voiceSample->isValid())
+{
+    const int maximumStart =
+        juce::jmax(
+            0,
+            voiceSample->audio.getNumSamples() - 2);
+
+    grainScanPosition =
+        settings.grainPosition * (double) maximumStart;
+}
+
+for (auto& grain : grains)
+    grain = {};
 
         velocity01 = velocity;
         level = 0.1f + velocity * 0.15f;
@@ -312,10 +324,10 @@ public:
         * pitchRatio
         * (double) pitchMods;
 
-    if (settings.sampleMode == 1)
-    {
-        renderGranular(sampleIncrement, l, r);
-    }
+    if (settings.sampleMode != 0)
+{
+    renderGranular(sampleIncrement, l, r);
+}
     else
     {
         const int sampleCount =
@@ -558,6 +570,7 @@ private:
 
     std::shared_ptr<const dyrekreds::SampleData> voiceSample;
     double samplePosition = 0.0;
+    double grainScanPosition = 0.0;
     std::array<Grain, maximumGrains> grains {};
     double samplesUntilNextGrain = 0.0;
 
@@ -583,8 +596,16 @@ private:
     const int sampleCount = voiceSample->audio.getNumSamples();
     const int maximumStart = juce::jmax(0, sampleCount - 2);
 
+    const bool frozen =
+    settings.sampleMode == 2;
+
     const double centre =
-        settings.grainPosition * (double) maximumStart;
+    frozen
+        ? settings.grainPosition * (double) maximumStart
+        : juce::jlimit(
+              0.0,
+              (double) maximumStart,
+              grainScanPosition);
 
     const double randomOffset =
         (double) (rng.nextFloat() * 2.0f - 1.0f)
@@ -709,8 +730,22 @@ private:
         left += readChannel(0) * gain * leftGain;
         right += readChannel(rightChannel) * gain * rightGain;
 
-        grain.position += grain.increment;
+                grain.position += grain.increment;
         ++grain.age;
+    }
+
+    if (settings.sampleMode == 1 && sampleCount > 1)
+    {
+        grainScanPosition += increment;
+
+        const double scanLength =
+            (double) (sampleCount - 1);
+
+        if (grainScanPosition >= scanLength)
+        {
+            grainScanPosition =
+                std::fmod(grainScanPosition, scanLength);
+        }
     }
 }
 

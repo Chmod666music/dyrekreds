@@ -350,6 +350,34 @@ void testSampleLoading()
         " (difference "
         + juce::String(stereoDifference, 4)
         + ")");
+    setParam(processor, pid::sampleMode, 2.0f);
+    setParam(processor, pid::grainPosition, 0.5f);
+    setParam(processor, pid::grainSpread, 0.0f);
+    setParam(processor, pid::grainStereo, 0.0f);
+    setParam(processor, pid::grainDensity, 20.0f);
+
+    const auto freezeRender =
+    render(
+        processor,
+        sampleRate,
+        128,
+        0.12,
+        sampleEvents);
+
+    check(
+    peakIn(freezeRender, sampleRate, 0.005, 0.09) > 0.001f,
+    "freeze mode renders audible grains");
+
+    float freezeWorst = 0.0f;
+    const bool freezeFinite =
+    allFinite(freezeRender, freezeWorst);
+
+    check(
+    freezeFinite,
+    "freeze output stays finite and bounded"
+        " (worst "
+        + juce::String(freezeWorst, 4)
+        + ")");
 
     setParam(processor, pid::sampleLvl, 0.0f);
 

@@ -232,10 +232,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout createGaldrParameterLayout()
 
     // SAMPLE AND GRANULAR SOURCE
     add(std::make_unique<AudioParameterChoice>(
-        ParameterID { pid::sampleMode, 1 },
-        "Sample Mode",
-        StringArray { "Sample", "Granular" },
-        0));
+    ParameterID { pid::sampleMode, 1 },
+    "Sample Mode",
+    StringArray { "Sample", "Granular", "Freeze" },
+    0));
 
     add(std::make_unique<AudioParameterFloat>(
         ParameterID { pid::sampleLvl, 1 },
