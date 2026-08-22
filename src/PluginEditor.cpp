@@ -97,7 +97,10 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
         auto& c1 = comboRow(s);
         addCombo(c1, pid::subWave);
         addCombo(c1, pid::subOct);
-        addCombo(comboRow(s), pid::noiseType);
+
+        auto& c2 = comboRow(s);
+        addCombo(c2, pid::noiseType);
+        addCombo(c2, pid::sampleMode);
 
         auto& r = knobRow(s);
         addKnob(r, pid::subLvl, "Sub");
@@ -248,19 +251,30 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
         }
     }
 
-    // ---- row 5: blizzard and visualizers
-    {
-        auto& s = addSection("Blizzard", { 12, 780, 340, 148 });
-        addCombo(comboRow(s), pid::bzGate);
-        auto& r = knobRow(s);
-        addKnob(r, pid::bzDensity, "Density");
-        addKnob(r, pid::bzSize, "Size");
-        addKnob(r, pid::bzPitch, "Pitch");
-        addKnob(r, pid::bzSpread, "Spread");
-        addKnob(r, pid::bzLvl, "Level");
-    }
-    addCustomSection("Oscilloscope", { 360, 780, 420, 148 }, scope);
-    addCustomSection("Spectrum", { 788, 780, 420, 148 }, spectrum);
+    // ---- row 5: blizzard, granular source and visualizers
+{
+    auto& s = addSection("Blizzard", { 12, 780, 300, 148 });
+    addCombo(comboRow(s), pid::bzGate);
+
+    auto& r = knobRow(s);
+    addKnob(r, pid::bzDensity, "Density");
+    addKnob(r, pid::bzSize, "Size");
+    addKnob(r, pid::bzPitch, "Pitch");
+    addKnob(r, pid::bzSpread, "Spread");
+    addKnob(r, pid::bzLvl, "Level");
+}
+{
+    auto& s = addSection("Granular", { 320, 780, 300, 148 });
+
+    auto& r = knobRow(s);
+    addKnob(r, pid::grainSize, "Size");
+    addKnob(r, pid::grainDensity, "Density");
+    addKnob(r, pid::grainPosition, "Position");
+    addKnob(r, pid::grainSpread, "Spread");
+}
+
+    addCustomSection("Oscilloscope", { 628, 780, 280, 148 }, scope);
+    addCustomSection("Spectrum", { 916, 780, 292, 148 }, spectrum);
 
     // ---- preset browser and header controls
     presetBrowser = std::make_unique<PresetBrowser>(processorRef, lnf);
