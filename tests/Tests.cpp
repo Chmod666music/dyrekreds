@@ -241,6 +241,28 @@ void testSampleLoading()
 
     check(std::abs(rootC5Frequency / 110.0f - 1.0f) < 0.01f,
           "root C5 transposes the sample down one octave");
+    setParam(processor, pid::sampleMode, 1.0f);
+    setParam(processor, pid::sampleRoot, 60.0f);
+    setParam(processor, pid::grainSize, 0.04f);
+    setParam(processor, pid::grainDensity, 20.0f);
+    setParam(processor, pid::grainPosition, 0.0f);
+    setParam(processor, pid::grainSpread, 0.0f);
+
+    const auto granularRender =
+        render(processor, sampleRate, 128, 0.12, sampleEvents);
+
+    check(peakIn(granularRender, sampleRate, 0.005, 0.09) > 0.001f,
+        "granular mode renders audible grains");
+
+    float granularWorst = 0.0f;
+    const bool granularFinite =
+    allFinite(granularRender, granularWorst);
+
+    check(granularFinite,
+      "granular output stays finite and bounded"
+          " (worst "
+          + juce::String(granularWorst, 4)
+          + ")");
 
     setParam(processor, pid::sampleLvl, 0.0f);
 

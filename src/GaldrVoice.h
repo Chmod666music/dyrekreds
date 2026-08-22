@@ -6,6 +6,7 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_dsp/juce_dsp.h>
 #include <atomic>
+#include <array>
 #include "GaldrDSP.h"
 #include "SampleData.h"
 
@@ -52,8 +53,13 @@ public:
 
         // Published atomically by the processor and acquired when a note starts.
         const std::shared_ptr<const dyrekreds::SampleData>* sampleSource = nullptr;
+        int sampleMode = 0;
         float sampleLvl = 0.7f;
         int sampleRoot = 60;
+        float grainSize = 0.08f;
+        float grainDensity = 12.0f;
+        float grainPosition = 0.0f;
+        float grainSpread = 0.25f;
 
         int   filterType = 0;
         float cutoff = 12000.0f, resonance = 0.2f, filterDrive = 0.0f;
@@ -116,6 +122,10 @@ public:
                                         std::memory_order_acquire)
             : nullptr;
         samplePosition = 0.0;
+        samplesUntilNextGrain = 0.0;
+
+        for (auto& grain : grains)
+            grain = {};
 
         velocity01 = velocity;
         level = 0.1f + velocity * 0.15f;
@@ -284,53 +294,69 @@ public:
             }
 
                 if (voiceSample != nullptr && voiceSample->isValid())
-            {
-                const int sampleCount =
-                    voiceSample->audio.getNumSamples();
+{
+    const float rootFrequency =
+        noteFrequency(settings.sampleRoot);
 
-                if (samplePosition < (double) sampleCount)
+    const double pitchRatio =
+        rootFrequency > 0.0f
+            ? (double) currentFreq / (double) rootFrequency
+            : 1.0;
+
+    const double sourceRateRatio =
+        voiceSample->sampleRate / (double) sr;
+
+    const double sampleIncrement =
+        sourceRateRatio
+        * pitchRatio
+        * (double) pitchMods;
+
+    if (settings.sampleMode == 1)
+    {
+        renderGranular(sampleIncrement, l, r);
+    }
+    else
+    {
+        const int sampleCount =
+            voiceSample->audio.getNumSamples();
+
+        if (samplePosition < (double) sampleCount)
+        {
+            const int index0 = (int) samplePosition;
+            const int index1 =
+                juce::jmin(index0 + 1, sampleCount - 1);
+
+            const float fraction =
+                (float) (samplePosition - (double) index0);
+
+            const auto readInterpolated =
+                [this, index0, index1, fraction](int channel)
                 {
-                    const int index0 = (int) samplePosition;
-                    const int index1 =
-                        juce::jmin(index0 + 1, sampleCount - 1);
-                    const float fraction =
-                        (float) (samplePosition - (double) index0);
+                    const float a =
+                        voiceSample->audio.getSample(
+                            channel,
+                            index0);
 
-                    const auto readInterpolated =
-                        [this, index0, index1, fraction](int channel)
-                        {
-                            const float a =
-                                voiceSample->audio.getSample(channel, index0);
-                            const float b =
-                                voiceSample->audio.getSample(channel, index1);
+                    const float b =
+                        voiceSample->audio.getSample(
+                            channel,
+                            index1);
 
-                            return a + fraction * (b - a);
-                        };
+                    return a + fraction * (b - a);
+                };
 
-                    const int rightChannel =
-                        juce::jmin(1,
-                            voiceSample->audio.getNumChannels() - 1);
+            const int rightChannel =
+                juce::jmin(
+                    1,
+                    voiceSample->audio.getNumChannels() - 1);
 
-                    l += readInterpolated(0) * settings.sampleLvl;
-                    r += readInterpolated(rightChannel) * settings.sampleLvl;
+            l += readInterpolated(0) * settings.sampleLvl;
+            r += readInterpolated(rightChannel) * settings.sampleLvl;
 
-                    const float rootFrequency =
-                        noteFrequency(settings.sampleRoot);
-                    const double pitchRatio =
-                        rootFrequency > 0.0f
-                            ? (double) currentFreq
-                                / (double) rootFrequency
-                            : 1.0;
-
-                    const double sourceRateRatio =
-                        voiceSample->sampleRate / (double) sr;
-
-                    samplePosition +=
-                        sourceRateRatio
-                        * pitchRatio
-                        * (double) pitchMods;
-                }
-            }
+            samplePosition += sampleIncrement;
+        }
+    }
+}
 
             l = std::tanh(l * driveGain);
             r = std::tanh(r * driveGain);
@@ -517,8 +543,156 @@ private:
     juce::dsp::StateVariableTPTFilter<float> filter1, filter2, filter3;
     juce::AudioBuffer<float> voiceBuffer;
 
+    struct Grain
+{
+    double position = 0.0;
+    double increment = 1.0;
+    int age = 0;
+    int length = 0;
+    float pan = 0.0f;
+    bool active = false;
+};
+
+    static constexpr size_t maximumGrains = 16;
+
     std::shared_ptr<const dyrekreds::SampleData> voiceSample;
     double samplePosition = 0.0;
+    std::array<Grain, maximumGrains> grains {};
+    double samplesUntilNextGrain = 0.0;
+
+    void startGrain(double increment)
+{
+    if (voiceSample == nullptr || ! voiceSample->isValid())
+        return;
+
+    Grain* available = nullptr;
+
+    for (auto& grain : grains)
+    {
+        if (! grain.active)
+        {
+            available = &grain;
+            break;
+        }
+    }
+
+    if (available == nullptr)
+        return;
+
+    const int sampleCount = voiceSample->audio.getNumSamples();
+    const int maximumStart = juce::jmax(0, sampleCount - 2);
+
+    const double centre =
+        settings.grainPosition * (double) maximumStart;
+
+    const double randomOffset =
+        (double) (rng.nextFloat() * 2.0f - 1.0f)
+        * settings.grainSpread
+        * (double) maximumStart;
+
+    available->position =
+        juce::jlimit(
+            0.0,
+            (double) maximumStart,
+            centre + randomOffset);
+
+    available->increment = increment;
+    available->age = 0;
+    available->length =
+        juce::jmax(
+            2,
+            juce::roundToInt(
+                settings.grainSize * getSampleRate()));
+    available->pan = 0.0f;
+    available->active = true;
+}
+
+    void renderGranular(double increment, float& left, float& right)
+{
+    if (voiceSample == nullptr || ! voiceSample->isValid())
+        return;
+
+    samplesUntilNextGrain -= 1.0;
+
+    if (samplesUntilNextGrain <= 0.0)
+    {
+        startGrain(increment);
+
+        const double density =
+            juce::jmax(1.0, (double) settings.grainDensity);
+
+        samplesUntilNextGrain +=
+            juce::jmax(1.0, getSampleRate() / density);
+    }
+
+    const int sampleCount = voiceSample->audio.getNumSamples();
+    const int rightChannel =
+        juce::jmin(
+            1,
+            voiceSample->audio.getNumChannels() - 1);
+
+    const float overlap =
+        juce::jmax(
+            1.0f,
+            settings.grainSize * settings.grainDensity);
+
+    const float normalisation =
+        1.0f / std::sqrt(overlap);
+
+    for (auto& grain : grains)
+    {
+        if (! grain.active)
+            continue;
+
+        if (grain.age >= grain.length
+            || grain.position >= (double) (sampleCount - 1))
+        {
+            grain.active = false;
+            continue;
+        }
+
+        const int index0 = (int) grain.position;
+        const int index1 =
+            juce::jmin(index0 + 1, sampleCount - 1);
+
+        const float fraction =
+            (float) (grain.position - (double) index0);
+
+        const auto readChannel =
+            [this, index0, index1, fraction](int channel)
+            {
+                const float a =
+                    voiceSample->audio.getSample(channel, index0);
+
+                const float b =
+                    voiceSample->audio.getSample(channel, index1);
+
+                return a + fraction * (b - a);
+            };
+
+        const float phase =
+            (float) grain.age
+            / (float) juce::jmax(1, grain.length - 1);
+
+        const float window =
+            0.5f
+            - 0.5f
+                * std::cos(
+                    juce::MathConstants<float>::twoPi
+                    * phase);
+
+        const float gain =
+            settings.sampleLvl
+            * normalisation
+            * window;
+
+        left += readChannel(0) * gain;
+        right += readChannel(rightChannel) * gain;
+
+        grain.position += grain.increment;
+        ++grain.age;
+    }
+}
 
     int note = 60;
     float level = 0.0f, velocity01 = 0.0f, random01 = 0.0f;

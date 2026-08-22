@@ -230,7 +230,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout createGaldrParameterLayout()
         StringArray { "White", "Pink" }, 0));
     add(std::make_unique<AudioParameterFloat>(ParameterID { pid::noiseLvl, 1 }, "Noise Level", zeroOne, 0.0f, percent));
 
-    // ---- sample source
+    // SAMPLE AND GRANULAR SOURCE
+    add(std::make_unique<AudioParameterChoice>(
+        ParameterID { pid::sampleMode, 1 },
+        "Sample Mode",
+        StringArray { "Sample", "Granular" },
+        0));
+
     add(std::make_unique<AudioParameterFloat>(
         ParameterID { pid::sampleLvl, 1 },
         "Sample Level",
@@ -245,6 +251,34 @@ juce::AudioProcessorValueTreeState::ParameterLayout createGaldrParameterLayout()
         127,
         60,
         midiNote));
+
+    add(std::make_unique<AudioParameterFloat>(
+        ParameterID { pid::grainSize, 1 },
+        "Grain Size",
+        NormalisableRange<float>(0.005f, 0.5f, 0.0f, 0.35f),
+        0.08f,
+        seconds));
+
+    add(std::make_unique<AudioParameterFloat>(
+        ParameterID { pid::grainDensity, 1 },
+        "Grain Density",
+        NormalisableRange<float>(1.0f, 80.0f, 0.0f, 0.4f),
+        12.0f,
+        perSecond));
+
+    add(std::make_unique<AudioParameterFloat>(
+        ParameterID { pid::grainPosition, 1 },
+        "Grain Position",
+        zeroOne,
+        0.0f,
+        percent));
+
+    add(std::make_unique<AudioParameterFloat>(
+        ParameterID { pid::grainSpread, 1 },
+        "Grain Position Spread",
+        zeroOne,
+        0.25f,
+        percent));
 
     // FILTER
 
@@ -474,8 +508,13 @@ void GaldrAudioProcessor::updateSettings(int numSamples)
     settings.noiseType = (int) raw(pid::noiseType);
     settings.noiseLvl  = raw(pid::noiseLvl);
 
-    settings.sampleLvl  = raw(pid::sampleLvl);
-    settings.sampleRoot = (int) raw(pid::sampleRoot);
+    settings.sampleMode     = (int) raw(pid::sampleMode);
+    settings.sampleLvl      = raw(pid::sampleLvl);
+    settings.sampleRoot     = (int) raw(pid::sampleRoot);
+    settings.grainSize      = raw(pid::grainSize);
+    settings.grainDensity   = raw(pid::grainDensity);
+    settings.grainPosition  = raw(pid::grainPosition);
+    settings.grainSpread    = raw(pid::grainSpread);
 
     settings.filterType  = (int) raw(pid::filterType);
     settings.cutoff      = raw(pid::cutoff);
