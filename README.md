@@ -1,6 +1,6 @@
 # Dyrekreds
 
-[![Build](https://github.com/Chmod666music/galdr/actions/workflows/build.yml/badge.svg?branch=dyrekreds)](https://github.com/Chmod666music/galdr/actions/workflows/build.yml)
+[![Build](https://github.com/Chmod666music/dyrekreds/actions/workflows/build.yml/badge.svg?branch=dyrekreds)](https://github.com/Chmod666music/dyrekreds/actions/workflows/build.yml)
 
 **Dyrekreds** is a free and open-source synthesizer plugin maintained by
 **Fuimadane**. It is derived from
@@ -53,8 +53,8 @@ Requirements:
 Clone the Dyrekreds development branch and its submodules:
 
 ```sh
-git clone --branch dyrekreds --recurse-submodules https://github.com/Chmod666music/galdr.git
-cd galdr
+git clone --branch dyrekreds --recurse-submodules https://github.com/Chmod666music/dyrekreds.git
+cd dyrekreds
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release --parallel
 ```

@@ -11,7 +11,7 @@ Original source: https://github.com/andreademurtas/galdr
 Dyrekreds:
 Copyright (C) 2026 Jon Skarin
 Modifications begun: 2026-08-21
-Development source: https://github.com/Chmod666music/galdr
+Development source: https://github.com/Chmod666music/dyrekreds
 
 Galdr and Dyrekreds are free software: you can redistribute and/or modify
 the covered source code under the terms of the GNU General Public License
