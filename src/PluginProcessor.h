@@ -61,7 +61,16 @@ public:
             return getGranularPlayhead();
 
         if (const auto* position = apvts.getRawParameterValue(pid::grainPosition))
-            return position->load(std::memory_order_relaxed);
+        {
+            const auto start = apvts.getRawParameterValue(pid::sampleStart)
+                                   ->load(std::memory_order_relaxed);
+            const auto end = apvts.getRawParameterValue(pid::sampleEnd)
+                                 ->load(std::memory_order_relaxed);
+            const auto rangeStart = juce::jmin(start, end);
+            const auto rangeEnd = juce::jmax(start, end);
+            return juce::jmap(position->load(std::memory_order_relaxed),
+                              rangeStart, rangeEnd);
+        }
 
         return 0.0f;
     }
@@ -69,7 +78,7 @@ public:
     // Versioned state. captureFullState is what the host stores; preset files
     // use capturePresetState (no MIDI map: controller setup is not a sound).
     // applyStateTree migrates old versions and restores tuning and mappings.
-    static constexpr int stateVersion = 3;
+    static constexpr int stateVersion = 4;
     juce::ValueTree captureFullState();
     juce::ValueTree capturePresetState();
     void applyStateTree(juce::ValueTree tree);

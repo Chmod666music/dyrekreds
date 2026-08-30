@@ -225,11 +225,15 @@ private:
     SampleProvider sampleProvider,
     PlayheadProvider playheadProvider,
     juce::RangedAudioParameter& position,
-    juce::RangedAudioParameter& spread)
+    juce::RangedAudioParameter& spread,
+    juce::RangedAudioParameter& sampleStart,
+    juce::RangedAudioParameter& sampleEnd)
     : getSample(std::move(sampleProvider)),
       getPlayhead(std::move(playheadProvider)),
       positionParameter(position),
-      spreadParameter(spread)
+      spreadParameter(spread),
+      startParameter(sampleStart),
+      endParameter(sampleEnd)
 {
     setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
     startTimerHz(30);
@@ -254,10 +258,15 @@ private:
     1.0f,
     getPlayhead());
 
+    rangeStart = juce::jlimit(0.0f, 1.0f, startParameter.getValue());
+    rangeEnd = juce::jlimit(0.0f, 1.0f, endParameter.getValue());
+    if (rangeStart > rangeEnd)
+        std::swap(rangeStart, rangeEnd);
+
     spread = juce::jlimit(
     0.0f,
     1.0f,
-    spreadParameter.getValue());
+    spreadParameter.getValue()) * (rangeEnd - rangeStart);
 
     repaint();
 }
@@ -342,6 +351,13 @@ private:
         1.0f,
         playhead + spread);
 
+    const float rangeStartX = bounds.getX() + rangeStart * bounds.getWidth();
+    const float rangeEndX = bounds.getX() + rangeEnd * bounds.getWidth();
+
+    g.setColour(juce::Colours::black.withAlpha(0.48f));
+    g.fillRect(bounds.withRight(rangeStartX));
+    g.fillRect(bounds.withLeft(rangeEndX));
+
     const float spreadX =
     bounds.getX()
     + spreadStart * bounds.getWidth();
@@ -422,14 +438,37 @@ private:
     bounds.getY() + 6.0f);
 
     g.fillPath(marker);
+
+    g.setColour(theme::boneDim.withAlpha(0.9f));
+    g.drawVerticalLine(juce::roundToInt(rangeStartX),
+                       bounds.getY(), bounds.getBottom());
+    g.drawVerticalLine(juce::roundToInt(rangeEndX),
+                       bounds.getY(), bounds.getBottom());
+
+    constexpr float handleWidth = 5.0f;
+    g.fillRect(rangeStartX - handleWidth * 0.5f, bounds.getY(),
+               handleWidth, 12.0f);
+    g.fillRect(rangeEndX - handleWidth * 0.5f, bounds.getY(),
+               handleWidth, 12.0f);
     }
     void mouseDown(const juce::MouseEvent& event) override
 {
     if (displayedSample == nullptr)
         return;
 
-    positionParameter.beginChangeGesture();
-    updatePositionFromMouse(event.x);
+    const auto bounds = getLocalBounds().toFloat().reduced(1.0f);
+    const auto startX = bounds.getX() + rangeStart * bounds.getWidth();
+    const auto endX = bounds.getX() + rangeEnd * bounds.getWidth();
+
+    if (std::abs((float) event.x - startX) <= 8.0f)
+        dragTarget = DragTarget::start;
+    else if (std::abs((float) event.x - endX) <= 8.0f)
+        dragTarget = DragTarget::end;
+    else
+        dragTarget = DragTarget::position;
+
+    activeParameter().beginChangeGesture();
+    updateFromMouse(event.x);
 }
 
     void mouseDrag(const juce::MouseEvent& event) override
@@ -437,16 +476,28 @@ private:
     if (displayedSample == nullptr)
         return;
 
-    updatePositionFromMouse(event.x);
+    updateFromMouse(event.x);
 }
 
     void mouseUp(const juce::MouseEvent&) override
 {
-    if (displayedSample != nullptr)
-        positionParameter.endChangeGesture();
+    if (displayedSample != nullptr && dragTarget != DragTarget::none)
+    {
+        activeParameter().endChangeGesture();
+        dragTarget = DragTarget::none;
+    }
 }
 
-    void updatePositionFromMouse(int mouseX)
+    juce::RangedAudioParameter& activeParameter() noexcept
+    {
+        if (dragTarget == DragTarget::start)
+            return startParameter;
+        if (dragTarget == DragTarget::end)
+            return endParameter;
+        return positionParameter;
+    }
+
+    void updateFromMouse(int mouseX)
 {
     const auto bounds =
         getLocalBounds().toFloat().reduced(1.0f);
@@ -458,15 +509,37 @@ private:
             ((float) mouseX - bounds.getX())
                 / juce::jmax(1.0f, bounds.getWidth()));
 
-    positionParameter.setValueNotifyingHost(normalised);
+    constexpr float minimumRange = 0.001f;
+    if (dragTarget == DragTarget::start)
+    {
+        startParameter.setValueNotifyingHost(
+            juce::jmin(normalised, rangeEnd - minimumRange));
+    }
+    else if (dragTarget == DragTarget::end)
+    {
+        endParameter.setValueNotifyingHost(
+            juce::jmax(normalised, rangeStart + minimumRange));
+    }
+    else
+    {
+        const auto selectedLength = juce::jmax(minimumRange, rangeEnd - rangeStart);
+        positionParameter.setValueNotifyingHost(
+            juce::jlimit(0.0f, 1.0f, (normalised - rangeStart) / selectedLength));
+    }
 }
     SampleProvider getSample;
     PlayheadProvider getPlayhead;
     juce::RangedAudioParameter& positionParameter;
     juce::RangedAudioParameter& spreadParameter;
+    juce::RangedAudioParameter& startParameter;
+    juce::RangedAudioParameter& endParameter;
     std::shared_ptr<const dyrekreds::SampleData> displayedSample;
     std::vector<float> waveform;
     float playhead = 0.0f;
     float spread = 0.0f;
+    float rangeStart = 0.0f;
+    float rangeEnd = 1.0f;
+    enum class DragTarget { none, position, start, end };
+    DragTarget dragTarget = DragTarget::none;
 };
 } // namespace galdr

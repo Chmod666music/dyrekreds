@@ -253,6 +253,20 @@ juce::AudioProcessorValueTreeState::ParameterLayout createGaldrParameterLayout()
         60,
         midiNote));
 
+    add(std::make_unique<AudioParameterFloat>(
+        ParameterID { pid::sampleStart, 1 },
+        "Sample Start",
+        zeroOne,
+        0.0f,
+        percent));
+
+    add(std::make_unique<AudioParameterFloat>(
+        ParameterID { pid::sampleEnd, 1 },
+        "Sample End",
+        zeroOne,
+        1.0f,
+        percent));
+
     add(std::make_unique<AudioParameterChoice>(
     ParameterID { pid::grainMotion, 1 },
     "Grain Motion",
@@ -530,6 +544,8 @@ void GaldrAudioProcessor::updateSettings(int numSamples)
     settings.sampleMode     = (int) raw(pid::sampleMode);
     settings.sampleLvl      = raw(pid::sampleLvl);
     settings.sampleRoot     = (int) raw(pid::sampleRoot);
+    settings.sampleStart    = raw(pid::sampleStart);
+    settings.sampleEnd      = raw(pid::sampleEnd);
     settings.grainMotion    = (int) raw(pid::grainMotion);
     settings.grainSize      = raw(pid::grainSize);
     settings.grainDensity   = raw(pid::grainDensity);

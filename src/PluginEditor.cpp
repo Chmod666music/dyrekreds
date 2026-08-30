@@ -61,7 +61,9 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
     [&p] { return p.currentSample(); },
     [&p] { return p.getGranularDisplayPosition(); },
     *p.apvts.getParameter(pid::grainPosition),
-    *p.apvts.getParameter(pid::grainSpread)),
+    *p.apvts.getParameter(pid::grainSpread),
+    *p.apvts.getParameter(pid::sampleStart),
+    *p.apvts.getParameter(pid::sampleEnd)),
     spectrum(p.spectrumFifo, [&p] { return p.getSampleRate(); })
 {
     sections.reserve(24);

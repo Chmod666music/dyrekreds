@@ -271,6 +271,15 @@ void testSampleLoading()
     check(peakIn(sampleRender, sampleRate, 0.005, 0.09) > 0.01f,
           "loaded sample renders from MIDI with oscillators muted");
 
+    setParam(processor, pid::sampleEnd, 0.25f);
+    const auto trimmedSampleRender =
+        render(processor, sampleRate, 128, 0.12, sampleEvents);
+    check(peakIn(trimmedSampleRender, sampleRate, 0.005, 0.02) > 0.01f,
+          "sample end keeps audio inside the selected range");
+    check(peakIn(trimmedSampleRender, sampleRate, 0.04, 0.08) < 0.0001f,
+          "sample end stops audio outside the selected range");
+    setParam(processor, pid::sampleEnd, 1.0f);
+
     const float rootC4Frequency =
         measureFreq(sampleRender, sampleRate, 0.005, 0.09);
 
@@ -294,9 +303,13 @@ void testSampleLoading()
     setParam(processor, pid::grainPosition, 0.0f);
     setParam(processor, pid::grainSpread, 0.0f);
 
-    setParam(processor, pid::grainPosition, 0.73f);
-    check(std::abs(processor.getGranularDisplayPosition() - 0.73f) < 0.001f,
-          "idle granular display follows the position parameter");
+    setParam(processor, pid::sampleStart, 0.25f);
+    setParam(processor, pid::sampleEnd, 0.75f);
+    setParam(processor, pid::grainPosition, 0.5f);
+    check(std::abs(processor.getGranularDisplayPosition() - 0.5f) < 0.001f,
+          "idle granular display maps position into the selected sample range");
+    setParam(processor, pid::sampleStart, 0.0f);
+    setParam(processor, pid::sampleEnd, 1.0f);
     setParam(processor, pid::grainPosition, 0.0f);
 
     const auto granularRender =
@@ -321,6 +334,9 @@ void testSampleLoading()
     "Reverse",
     "Bounce"
 };
+
+    setParam(processor, pid::sampleStart, 0.25f);
+    setParam(processor, pid::sampleEnd, 0.75f);
 
     for (int motion = 0; motion < motionNames.size(); ++motion)
 {
@@ -369,14 +385,17 @@ void testSampleLoading()
         processor.getGranularPlayhead();
 
     check(
-        playhead >= 0.0f
-            && playhead <= 1.0f,
+        playhead >= 0.25f
+            && playhead <= 0.75f,
         motionName
             + " playhead stays inside the sample"
             + " (position "
             + juce::String(playhead, 4)
             + ")");
 }
+
+setParam(processor, pid::sampleStart, 0.0f);
+setParam(processor, pid::sampleEnd, 1.0f);
 
 setParam(processor, pid::grainMotion, 0.0f);
     setParam(processor, pid::grainDensity, 80.0f);
