@@ -996,6 +996,9 @@ void GaldrAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         for (int i = 0; i < synth.getNumVoices() && ! anyVoiceActive; ++i)
             anyVoiceActive = synth.getVoice(i)->isVoiceActive();
 
+        granularVoiceActive.store(anyVoiceActive && settings.sampleMode != 0,
+                                  std::memory_order_relaxed);
+
         const bool freeRunning = (int) raw(pid::bzGate) == 1;
         const float target = (freeRunning || anyVoiceActive) ? 1.0f : 0.0f;
         const float tau = target > bzGateEnv ? 0.04f : 0.25f;

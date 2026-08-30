@@ -294,6 +294,11 @@ void testSampleLoading()
     setParam(processor, pid::grainPosition, 0.0f);
     setParam(processor, pid::grainSpread, 0.0f);
 
+    setParam(processor, pid::grainPosition, 0.73f);
+    check(std::abs(processor.getGranularDisplayPosition() - 0.73f) < 0.001f,
+          "idle granular display follows the position parameter");
+    setParam(processor, pid::grainPosition, 0.0f);
+
     const auto granularRender =
         render(processor, sampleRate, 128, 0.12, sampleEvents);
 

@@ -55,6 +55,16 @@ public:
 {
     return granularPlayhead.load(std::memory_order_relaxed);
 }
+    float getGranularDisplayPosition() const noexcept
+    {
+        if (granularVoiceActive.load(std::memory_order_relaxed))
+            return getGranularPlayhead();
+
+        if (const auto* position = apvts.getRawParameterValue(pid::grainPosition))
+            return position->load(std::memory_order_relaxed);
+
+        return 0.0f;
+    }
 
     // Versioned state. captureFullState is what the host stores; preset files
     // use capturePresetState (no MIDI map: controller setup is not a sound).
@@ -99,6 +109,7 @@ private:
     galdr::Tuning tuning;
     std::shared_ptr<const dyrekreds::SampleData> sampleData;
     std::atomic<float> granularPlayhead { 0.0f };
+    std::atomic<bool> granularVoiceActive { false };
 
     // MIDI CC -> parameter map, written on the message thread, read per block.
     std::atomic<juce::RangedAudioParameter*> midiCCMap[128] {};

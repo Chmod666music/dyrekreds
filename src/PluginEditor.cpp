@@ -59,7 +59,7 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
       scope(p.scopeFifo),
     sampleWaveform(
     [&p] { return p.currentSample(); },
-    [&p] { return p.getGranularPlayhead(); },
+    [&p] { return p.getGranularDisplayPosition(); },
     *p.apvts.getParameter(pid::grainPosition),
     *p.apvts.getParameter(pid::grainSpread)),
     spectrum(p.spectrumFifo, [&p] { return p.getSampleRate(); })
