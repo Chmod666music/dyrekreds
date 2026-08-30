@@ -465,7 +465,7 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
     setLookAndFeel(&lnf);
     tooltipWindow.setLookAndFeel(&lnf);
 
-    setResizable(true, true);
+    setResizable(true, false);
     getConstrainer()->setFixedAspectRatio((double) baseW / (double) baseH);
     setResizeLimits(baseW * 3 / 4, baseH * 3 / 4, baseW * 2, baseH * 2);
     setSize(baseW, baseH);
