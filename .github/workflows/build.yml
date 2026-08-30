@@ -39,6 +39,30 @@ jobs:
       - name: Build
         run: cmake --build build --config Release --parallel
 
+      # JUCE generates VST3/Contents/Resources/moduleinfo.json in a post-build
+      # step after its initial ad-hoc signature check. That resource change
+      # invalidates the bundle seal, so macOS bundles must be signed only after
+      # every post-build step has finished.
+      - name: Finalize macOS bundle signatures
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          stage=build/Dyrekreds_artefacts/Release
+          bundles=(
+            "$stage/VST3/Dyrekreds.vst3"
+            "$stage/CLAP/Dyrekreds.clap"
+            "$stage/AU/Dyrekreds.component"
+            "$stage/Standalone/Dyrekreds.app"
+          )
+          for bundle in "${bundles[@]}"; do
+            if [ ! -e "$bundle" ]; then
+              echo "Missing expected macOS bundle: $bundle" >&2
+              exit 1
+            fi
+            codesign --force --sign - "$bundle"
+            codesign --verify --deep --strict --verbose=2 "$bundle"
+          done
+
       - name: Run unit tests
         shell: bash
         run: |
@@ -133,6 +157,28 @@ jobs:
             # tar preserves the executable bits that zip would lose
             tar czf "../../../dist/Dyrekreds-$RUNNER_OS.tar.gz" $dirs
           fi
+
+      # Check the exact files users will download, not only the build tree.
+      # This catches missing or altered sealed resources caused by packaging.
+      - name: Verify packaged macOS bundle signatures
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          mkdir packaged-macos
+          tar xzf dist/Dyrekreds-macOS.tar.gz -C packaged-macos
+          bundles=(
+            packaged-macos/VST3/Dyrekreds.vst3
+            packaged-macos/CLAP/Dyrekreds.clap
+            packaged-macos/AU/Dyrekreds.component
+            packaged-macos/Standalone/Dyrekreds.app
+          )
+          for bundle in "${bundles[@]}"; do
+            if [ ! -e "$bundle" ]; then
+              echo "Missing expected packaged macOS bundle: $bundle" >&2
+              exit 1
+            fi
+            codesign --verify --deep --strict --verbose=2 "$bundle"
+          done
 
       - name: Render audio demos
         if: runner.os == 'Linux'
