@@ -176,6 +176,27 @@ void testSampleLoading()
 {
     std::cout << "sample loading" << std::endl;
 
+    const auto mp3Fixture = juce::File(__FILE__)
+                                .getParentDirectory()
+                                .getParentDirectory()
+                                .getChildFile("JUCE/examples/Assets/Notifications/sounds/served.mp3");
+    check(mp3Fixture.existsAsFile(), "MP3 test fixture exists");
+
+    const auto mp3 = dyrekreds::SampleLoader::load(mp3Fixture);
+    check((bool) mp3, "MP3 sample loads"
+                         + (mp3.error.isNotEmpty() ? ": " + mp3.error
+                                                   : juce::String()));
+    if (mp3)
+    {
+        check(mp3.sample->isValid(), "loaded MP3 sample is valid");
+        check(mp3.sample->audio.getNumSamples() > 0,
+              "loaded MP3 contains decoded audio");
+    }
+
+    juce::MemoryBlock invalidMp3("not an mp3", 10);
+    check(! dyrekreds::SampleLoader::load(invalidMp3, "broken.mp3"),
+          "invalid MP3 is rejected without replacing the sample");
+
     constexpr double sampleRate = 48000.0;
     constexpr int numSamples = 4800;
 

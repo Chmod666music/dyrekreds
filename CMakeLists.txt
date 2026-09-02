@@ -39,6 +39,7 @@ target_sources(Dyrekreds PRIVATE
 target_compile_definitions(Dyrekreds PUBLIC
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
+    JUCE_USE_MP3AUDIOFORMAT=1
     JUCE_VST3_CAN_REPLACE_VST2=0
     # Disabling the splash screen is permitted when JUCE is used under the (A)GPL.
     JUCE_DISPLAY_SPLASH_SCREEN=0)
@@ -62,6 +63,7 @@ target_sources(DyrekredsTests PRIVATE
 target_compile_definitions(DyrekredsTests PRIVATE
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
+    JUCE_USE_MP3AUDIOFORMAT=1
     JUCE_DISPLAY_SPLASH_SCREEN=0
     JucePlugin_Name="Dyrekreds")
 target_link_libraries(DyrekredsTests PRIVATE
@@ -81,6 +83,7 @@ target_sources(DyrekredsDemoRender PRIVATE
 target_compile_definitions(DyrekredsDemoRender PRIVATE
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
+    JUCE_USE_MP3AUDIOFORMAT=1
     JUCE_DISPLAY_SPLASH_SCREEN=0
     JucePlugin_Name="Dyrekreds")
 target_link_libraries(DyrekredsDemoRender PRIVATE

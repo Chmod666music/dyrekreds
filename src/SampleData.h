@@ -111,7 +111,7 @@ private:
             formats.createReaderFor(std::move(stream)));
 
         if (reader == nullptr)
-            return { {}, "The data is not a supported WAV or AIFF sample." };
+            return { {}, "The data is not a supported WAV, AIFF or MP3 sample." };
 
         if (reader->sampleRate <= 0.0
             || reader->lengthInSamples <= 0

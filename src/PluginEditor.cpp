@@ -376,7 +376,7 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
 
         sampleButton.setTooltip(
             hasSample ? "Loaded sample: " + name
-                      : juce::String("Load a WAV or AIFF sample"));
+                      : juce::String("Load a WAV, AIFF or MP3 sample"));
     };
 
     updateSampleButton();
@@ -396,7 +396,7 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
                      false,
                      false);
         menu.addSeparator();
-        menu.addItem(1, "Load WAV or AIFF...");
+        menu.addItem(1, "Load WAV, AIFF or MP3...");
         menu.addItem(2, "Clear sample", hasSample);
 
         menu.showMenuAsync(
@@ -409,7 +409,7 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
                         "Load sample",
                         juce::File::getSpecialLocation(
                             juce::File::userMusicDirectory),
-                        "*.wav;*.aif;*.aiff");
+                        "*.wav;*.aif;*.aiff;*.mp3");
 
                     sampleChooser->launchAsync(
                         juce::FileBrowserComponent::openMode
