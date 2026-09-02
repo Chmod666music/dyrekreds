@@ -469,8 +469,8 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
 
     setResizable(true, false);
     getConstrainer()->setFixedAspectRatio((double) baseW / (double) baseH);
-    setResizeLimits(baseW * 3 / 4, baseH * 3 / 4, baseW * 2, baseH * 2);
-    setSize(baseW, baseH);
+    setResizeLimits(baseW * 2 / 3, baseH * 2 / 3, baseW * 2, baseH * 2);
+    setSize(baseW * 2 / 3, baseH * 2 / 3);
 
     setWantsKeyboardFocus(true);
     startTimerHz(4);
