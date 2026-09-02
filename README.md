@@ -64,10 +64,10 @@ Requirements:
 - A C++20 compiler
 - JUCE’s platform-specific build dependencies
 
-Clone the Dyrekreds development branch and its submodules:
+For the current Beta 3 test build, clone the `beta3` branch and its submodules:
 
 ```sh
-git clone --branch dyrekreds --recurse-submodules https://github.com/Chmod666music/dyrekreds.git
+git clone --branch beta3 --recurse-submodules https://github.com/Chmod666music/dyrekreds.git
 cd dyrekreds
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release --parallel
