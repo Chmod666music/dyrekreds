@@ -12,13 +12,16 @@ application. Development began on 21 August 2026.
 
 ## Project status
 
-Dyrekreds 0.9 is a public beta. The plugin is functional and tested
+Dyrekreds 0.9 Beta 3 is a public beta. The plugin is functional and tested
 automatically on Linux, Windows and macOS, but additional testing across DAWs,
 hardware and real-world projects is welcome before the 1.0 release.
 
 Dyrekreds is derived from Galdr, while establishing its own product identity,
 plugin IDs, preset directory and expanding sound engine. Dyrekreds and Galdr
 can be installed side by side.
+
+Beta 3 adds MP3 sample loading support and continues development of the sample
+workflow, GUI resizing and cross-platform compatibility.
 
 ## Features
 
@@ -31,7 +34,8 @@ can be installed side by side.
 - Tempo-synchronised arpeggiator, LFOs, tremolo and delay
 - MPE-friendly pitch bend and pressure
 - Scala `.scl` microtuning
-- WAV and AIFF sample import with pitch-tracked playback
+- WAV, AIFF and MP3 sample import with pitch-tracked playback
+- Draggable Sample Start/End controls
 - Granular and freeze modes with five grain-motion patterns
 - Interactive sample waveform with realtime playhead and scrubbing
 - Distortion, bitcrusher, ring modulation, chorus, delay and reverb
@@ -40,6 +44,16 @@ can be installed side by side.
 - MIDI learn, undo and redo
 - Sample waveform, spectrum analyser and on-screen keyboard
 - Resizable dark-fantasy interface
+
+## Downloads and testing
+
+Pre-release builds for Linux, Windows and macOS are available from:
+
+https://github.com/Chmod666music/dyrekreds/releases
+
+Testing feedback is also welcome on the Dyrekreds Discord:
+
+https://discord.gg/Pfvkux2bG
 
 ## Building
 
