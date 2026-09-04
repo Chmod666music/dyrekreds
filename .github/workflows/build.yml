@@ -212,11 +212,29 @@ jobs:
           path: dist
           merge-multiple: true
 
+      # Keep CI artifacts (including demos) unchanged; publish only named builds.
+      - name: Prepare release packages
+        id: packages
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          version="$RELEASE_TAG"
+          if [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-beta\.([0-9]+)$ ]]; then
+            version="Beta${BASH_REMATCH[1]}"
+          fi
+          mkdir release-dist
+          for package in Linux.tar.gz macOS.tar.gz Windows.zip; do
+            mv "dist/Dyrekreds-$package" "release-dist/Dyrekreds-$version-$package"
+          done
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
       - uses: softprops/action-gh-release@v2
         with:
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
           generate_release_notes: true
+          fail_on_unmatched_files: true
           files: |
-            dist/Dyrekreds-*
-            dist/dyrekreds-demo-full.mp3
+            release-dist/Dyrekreds-${{ steps.packages.outputs.version }}-Linux.tar.gz
+            release-dist/Dyrekreds-${{ steps.packages.outputs.version }}-macOS.tar.gz
+            release-dist/Dyrekreds-${{ steps.packages.outputs.version }}-Windows.zip
