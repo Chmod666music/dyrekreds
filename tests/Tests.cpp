@@ -158,6 +158,40 @@ float measureFreq(const std::vector<float>& v, double sr, double t0, double t1)
     return count > 1 ? (float) ((count - 1) / (last - first)) : 0.0f;
 }
 
+// Windowed spectral estimate for overlap-add/time-stretched material, where
+// grain boundaries can introduce extra zero crossings and correlation sidebands.
+float measurePeriodicFreq(const std::vector<float>& v, double sr, double t0, double t1,
+                          float minimumHz, float maximumHz)
+{
+    const int a = juce::jlimit(0, (int) v.size(), (int) (t0 * sr));
+    const int b = juce::jlimit(0, (int) v.size(), (int) (t1 * sr));
+    double bestMagnitude = -1.0;
+    float bestFrequency = minimumHz;
+
+    for (float frequency = minimumHz; frequency <= maximumHz; frequency += 0.25f)
+    {
+        double real = 0.0, imaginary = 0.0;
+        for (int i = a; i < b; ++i)
+        {
+            const double phase = juce::MathConstants<double>::twoPi
+                               * frequency * (double) (i - a) / sr;
+            const double window = 0.5 - 0.5 * std::cos(
+                juce::MathConstants<double>::twoPi * (double) (i - a)
+                / (double) juce::jmax(1, b - a - 1));
+            real += v[(size_t) i] * window * std::cos(phase);
+            imaginary -= v[(size_t) i] * window * std::sin(phase);
+        }
+        const double magnitude = real * real + imaginary * imaginary;
+        if (magnitude > bestMagnitude)
+        {
+            bestMagnitude = magnitude;
+            bestFrequency = frequency;
+        }
+    }
+
+    return bestFrequency;
+}
+
 bool allFinite(const std::vector<float>& v, float& worst)
 {
     worst = 0.0f;
@@ -265,9 +299,25 @@ void testSampleLoading()
         check(processor.getSampleName()
                   == file.getFileNameWithoutExtension(),
               "sample name is exposed");
+
+        check(loaded.sample->normalisationGain > 1.7f
+                  && loaded.sample->normalisationGain < 1.9f,
+              "quiet sample is normalised close to -1 dBFS");
+
+        check(loaded.sample->detectedMidiNote == 57,
+              "A3 sample pitch is detected");
+
+        check(std::abs(loaded.sample->detectedCents) < 2.0f,
+              "detected A3 pitch is close to concert tuning");
+
+        check((int) processor.apvts.getRawParameterValue(pid::sampleRoot)->load() == 57,
+              "detected pitch updates the sample Root parameter");
     }
 
-        neutralise(processor);
+    // Keep the original playback assertions explicit: C4 as root transposes
+    // the A3 fixture only when requested manually.
+    setParam(processor, pid::sampleRoot, 60.0f);
+    neutralise(processor);
     setParam(processor, pid::osc1Lvl, 0.0f);
     setParam(processor, pid::osc2Lvl, 0.0f);
     setParam(processor, pid::subLvl, 0.0f);
@@ -307,16 +357,76 @@ void testSampleLoading()
     check(std::abs(rootC4Frequency / 220.0f - 1.0f) < 0.01f,
           "root C4 preserves the sample pitch");
 
+    const std::vector<Event> heldSampleEvents {
+        { 0, juce::MidiMessage::noteOn(1, 60, 1.0f) },
+        { (int) (sampleRate * 0.28), juce::MidiMessage::noteOff(1, 60) }
+    };
+
+    setParam(processor, pid::sampleSpeed, 0.5f);
+    const auto halfSpeedRender =
+        render(processor, sampleRate, 128, 0.25, heldSampleEvents);
+    check(peakIn(halfSpeedRender, sampleRate, 0.12, 0.17) > 0.005f,
+          "half-speed time stretch extends sample duration");
+    const float halfSpeedFrequency = measurePeriodicFreq(
+        halfSpeedRender, sampleRate, 0.04, 0.14, 180.0f, 260.0f);
+    check(std::abs(halfSpeedFrequency / 220.0f - 1.0f) < 0.03f,
+          "Speed changes duration without changing pitch (got "
+              + juce::String(halfSpeedFrequency, 2) + " Hz)");
+
+    setParam(processor, pid::samplePitch, 12.0f);
+    const auto pitchedRender =
+        render(processor, sampleRate, 128, 0.25, heldSampleEvents);
+    const float pitchedFrequency = measurePeriodicFreq(
+        pitchedRender, sampleRate, 0.04, 0.14, 360.0f, 520.0f);
+    check(std::abs(pitchedFrequency / 440.0f - 1.0f) < 0.04f,
+          "Pitch transposes without cancelling half-speed stretch (got "
+              + juce::String(pitchedFrequency, 2) + " Hz)");
+
+    setParam(processor, pid::sampleSpeed, 1.0f);
+    setParam(processor, pid::samplePitch, 0.0f);
+
+    for (const double stretchRate : { 44100.0, 96000.0 })
+    {
+        GaldrAudioProcessor stretchProcessor;
+        check((bool) stretchProcessor.loadSample(file),
+              "time-stretch fixture loads at " + juce::String((int) stretchRate) + " Hz");
+        neutralise(stretchProcessor);
+        setParam(stretchProcessor, pid::osc1Lvl, 0.0f);
+        setParam(stretchProcessor, pid::osc2Lvl, 0.0f);
+        setParam(stretchProcessor, pid::subLvl, 0.0f);
+        setParam(stretchProcessor, pid::noiseLvl, 0.0f);
+        setParam(stretchProcessor, pid::sampleSpeed, 0.5f);
+        setParam(stretchProcessor, pid::stretchMode, 2.0f);
+        setParam(stretchProcessor, pid::attack, 0.001f);
+        setParam(stretchProcessor, pid::decay, 0.001f);
+        setParam(stretchProcessor, pid::sustain, 1.0f);
+        setParam(stretchProcessor, pid::release, 0.01f);
+        stretchProcessor.prepareToPlay(stretchRate, 128);
+
+        const std::vector<Event> stretchEvents {
+            { 0, juce::MidiMessage::noteOn(1, 57, 1.0f) },
+            { (int) (stretchRate * 0.18), juce::MidiMessage::noteOff(1, 57) }
+        };
+        const auto stretched = render(
+            stretchProcessor, stretchRate, 128, 0.2, stretchEvents);
+        float stretchWorst = 0.0f;
+        check(allFinite(stretched, stretchWorst)
+                  && peakIn(stretched, stretchRate, 0.04, 0.14) > 0.001f,
+              "percussive time stretch stays live and bounded at "
+                  + juce::String((int) stretchRate) + " Hz");
+    }
+
     setParam(processor, pid::sampleRoot, 72.0f);
 
     const auto rootC5Render =
         render(processor, sampleRate, 128, 0.12, sampleEvents);
 
-    const float rootC5Frequency =
-        measureFreq(rootC5Render, sampleRate, 0.005, 0.09);
+    const float rootC5Frequency = measurePeriodicFreq(
+        rootC5Render, sampleRate, 0.02, 0.09, 90.0f, 140.0f);
 
-    check(std::abs(rootC5Frequency / 110.0f - 1.0f) < 0.01f,
-          "root C5 transposes the sample down one octave");
+    check(std::abs(rootC5Frequency / 110.0f - 1.0f) < 0.03f,
+          "root C5 transposes the sample down one octave (got "
+              + juce::String(rootC5Frequency, 2) + " Hz)");
     setParam(processor, pid::sampleMode, 1.0f);
     setParam(processor, pid::sampleRoot, 60.0f);
     setParam(processor, pid::grainSize, 0.04f);

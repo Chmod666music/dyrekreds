@@ -36,6 +36,9 @@ namespace pid
     inline constexpr auto sampleMode    = "sampleMode";
     inline constexpr auto sampleLvl     = "sampleLvl";
     inline constexpr auto sampleRoot    = "sampleRoot";
+    inline constexpr auto sampleSpeed   = "sampleSpeed";
+    inline constexpr auto samplePitch   = "samplePitch";
+    inline constexpr auto stretchMode   = "stretchMode";
     inline constexpr auto sampleStart   = "sampleStart";
     inline constexpr auto sampleEnd     = "sampleEnd";
     inline constexpr auto grainMotion   = "grainMotion";

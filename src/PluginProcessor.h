@@ -51,6 +51,7 @@ public:
     void clearSample();
     std::shared_ptr<const dyrekreds::SampleData> currentSample() const;
     juce::String getSampleName() const;
+    juce::String getSampleAnalysis() const;
     float getGranularPlayhead() const noexcept
 {
     return granularPlayhead.load(std::memory_order_relaxed);
@@ -78,7 +79,7 @@ public:
     // Versioned state. captureFullState is what the host stores; preset files
     // use capturePresetState (no MIDI map: controller setup is not a sound).
     // applyStateTree migrates old versions and restores tuning and mappings.
-    static constexpr int stateVersion = 4;
+    static constexpr int stateVersion = 5;
     juce::ValueTree captureFullState();
     juce::ValueTree capturePresetState();
     void applyStateTree(juce::ValueTree tree);

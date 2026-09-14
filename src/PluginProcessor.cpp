@@ -64,6 +64,12 @@ GaldrAudioProcessor::loadSample(const juce::File& file)
         std::atomic_store_explicit(&sampleData,
                                    result.sample,
                                    std::memory_order_release);
+
+        if (result.sample->detectedMidiNote >= 0)
+            if (auto* root = apvts.getParameter(pid::sampleRoot))
+                root->setValueNotifyingHost(
+                    root->convertTo0to1((float) result.sample->detectedMidiNote));
+
         presetDirty.store(true);
     }
 
@@ -92,6 +98,32 @@ juce::String GaldrAudioProcessor::getSampleName() const
         return sample->name;
 
     return {};
+}
+
+juce::String GaldrAudioProcessor::getSampleAnalysis() const
+{
+    const auto sample = currentSample();
+    if (sample == nullptr)
+        return {};
+
+    juce::String analysis = "Normalised ";
+    analysis += juce::String(juce::Decibels::gainToDecibels(sample->normalisationGain), 1);
+    analysis += " dB";
+
+    if (sample->detectedMidiNote >= 0)
+    {
+        analysis += "; detected ";
+        analysis += juce::MidiMessage::getMidiNoteName(
+            sample->detectedMidiNote, true, true, 4);
+        analysis += sample->detectedCents >= 0.0f ? " +" : " ";
+        analysis += juce::String(sample->detectedCents, 1) + " cents";
+    }
+    else
+    {
+        analysis += "; pitch not detected";
+    }
+
+    return analysis;
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout createGaldrParameterLayout()
@@ -150,6 +182,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout createGaldrParameterLayout()
         .withStringFromValueFunction([](float value, int)
         {
             return String(value, 1) + " /s";
+        });
+
+    const auto multiplier = AudioParameterFloatAttributes()
+        .withStringFromValueFunction([](float value, int)
+        {
+            return String(value, 2) + "x";
         });
 
     const auto midiNote = AudioParameterIntAttributes()
@@ -252,6 +290,29 @@ juce::AudioProcessorValueTreeState::ParameterLayout createGaldrParameterLayout()
         127,
         60,
         midiNote));
+
+    add(std::make_unique<AudioParameterFloat>(
+        ParameterID { pid::sampleSpeed, 1 },
+        "Sample Speed",
+        NormalisableRange<float>(0.25f, 4.0f, 0.0f, 0.35f),
+        1.0f,
+        multiplier));
+
+    add(std::make_unique<AudioParameterFloat>(
+        ParameterID { pid::samplePitch, 1 },
+        "Sample Pitch",
+        NormalisableRange<float>(-24.0f, 24.0f, 1.0f),
+        0.0f,
+        AudioParameterFloatAttributes().withStringFromValueFunction([](float value, int)
+        {
+            return String(value >= 0.0f ? "+" : "") + String(roundToInt(value)) + " st";
+        })));
+
+    add(std::make_unique<AudioParameterChoice>(
+        ParameterID { pid::stretchMode, 1 },
+        "Stretch Transients",
+        StringArray { "Smooth", "Transient", "Percussive" },
+        0));
 
     add(std::make_unique<AudioParameterFloat>(
         ParameterID { pid::sampleStart, 1 },
@@ -544,6 +605,9 @@ void GaldrAudioProcessor::updateSettings(int numSamples)
     settings.sampleMode     = (int) raw(pid::sampleMode);
     settings.sampleLvl      = raw(pid::sampleLvl);
     settings.sampleRoot     = (int) raw(pid::sampleRoot);
+    settings.sampleSpeed    = raw(pid::sampleSpeed);
+    settings.samplePitch    = raw(pid::samplePitch);
+    settings.stretchMode    = (int) raw(pid::stretchMode);
     settings.sampleStart    = raw(pid::sampleStart);
     settings.sampleEnd      = raw(pid::sampleEnd);
     settings.grainMotion    = (int) raw(pid::grainMotion);
@@ -1012,7 +1076,7 @@ void GaldrAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         for (int i = 0; i < synth.getNumVoices() && ! anyVoiceActive; ++i)
             anyVoiceActive = synth.getVoice(i)->isVoiceActive();
 
-        granularVoiceActive.store(anyVoiceActive && settings.sampleMode != 0,
+        granularVoiceActive.store(anyVoiceActive,
                                   std::memory_order_relaxed);
 
         const bool freeRunning = (int) raw(pid::bzGate) == 1;

@@ -56,6 +56,9 @@ public:
         int sampleMode = 0;
         float sampleLvl = 0.7f;
         int sampleRoot = 60;
+        float sampleSpeed = 1.0f;
+        float samplePitch = 0.0f;
+        int stretchMode = 1;
         float sampleStart = 0.0f;
         float sampleEnd = 1.0f;
         int grainMotion = 0;
@@ -96,6 +99,7 @@ public:
         filter1.prepare(spec);
         filter2.prepare(spec);
         filter3.prepare(spec);
+        stretchSmoothingCoeff = 1.0f - std::exp(-1.0f / (0.025f * (float) sampleRate));
     }
 
     bool canPlaySound(juce::SynthesiserSound* s) override
@@ -131,6 +135,10 @@ public:
         grainScanDirection = 1.0;
         lastGrainPosition = settings.grainPosition;
         samplesUntilNextGrain = 0.0;
+        smoothedSampleSpeed = settings.sampleSpeed;
+        smoothedSamplePitch = settings.samplePitch;
+        timeStretchFinished = false;
+        stretchOutputSamples = 0.0;
 
 
         if (voiceSample != nullptr && voiceSample->isValid())
@@ -336,58 +344,21 @@ for (auto& grain : grains)
     const double sourceRateRatio =
         voiceSample->sampleRate / (double) sr;
 
+    smoothedSampleSpeed += (settings.sampleSpeed - smoothedSampleSpeed)
+                           * stretchSmoothingCoeff;
+    smoothedSamplePitch += (settings.samplePitch - smoothedSamplePitch)
+                           * stretchSmoothingCoeff;
+
     const double sampleIncrement =
         sourceRateRatio
         * pitchRatio
+        * std::exp2((double) smoothedSamplePitch / 12.0)
         * (double) pitchMods;
 
-    if (settings.sampleMode != 0)
-{
-    renderGranular(sampleIncrement, l, r);
-}
-    else
-    {
-        const int sampleCount =
-            voiceSample->audio.getNumSamples();
+    const double scanIncrement =
+        sourceRateRatio * (double) smoothedSampleSpeed;
 
-        const auto range = sampleRange(sampleCount - 1);
-
-        if (samplePosition <= range.end)
-        {
-            const int index0 = (int) samplePosition;
-            const int index1 =
-                juce::jmin(index0 + 1, sampleCount - 1);
-
-            const float fraction =
-                (float) (samplePosition - (double) index0);
-
-            const auto readInterpolated =
-                [this, index0, index1, fraction](int channel)
-                {
-                    const float a =
-                        voiceSample->audio.getSample(
-                            channel,
-                            index0);
-
-                    const float b =
-                        voiceSample->audio.getSample(
-                            channel,
-                            index1);
-
-                    return a + fraction * (b - a);
-                };
-
-            const int rightChannel =
-                juce::jmin(
-                    1,
-                    voiceSample->audio.getNumChannels() - 1);
-
-            l += readInterpolated(0) * settings.sampleLvl;
-            r += readInterpolated(rightChannel) * settings.sampleLvl;
-
-            samplePosition += sampleIncrement;
-        }
-    }
+    renderGranular(sampleIncrement, scanIncrement, l, r);
 }
 
             l = std::tanh(l * driveGain);
@@ -427,7 +398,7 @@ for (auto& grain : grains)
         if (settings.granularPlayhead != nullptr
             && voiceSample != nullptr
             && voiceSample->isValid()
-            && settings.sampleMode != 0)
+            )
         {
             const double maximumPosition =
                 (double) juce::jmax(
@@ -615,6 +586,11 @@ private:
     float lastGrainPosition = 0.0f;
     std::array<Grain, maximumGrains> grains {};
     double samplesUntilNextGrain = 0.0;
+    float smoothedSampleSpeed = 1.0f;
+    float smoothedSamplePitch = 0.0f;
+    float stretchSmoothingCoeff = 0.01f;
+    bool timeStretchFinished = false;
+    double stretchOutputSamples = 0.0;
 
     struct SampleRange
     {
@@ -633,7 +609,7 @@ private:
         return { first * maximum, last * maximum };
     }
 
-    void startGrain(double increment)
+    void startGrain(double increment, bool timeStretch)
 {
     if (voiceSample == nullptr || ! voiceSample->isValid())
         return;
@@ -655,8 +631,10 @@ private:
     const int sampleCount = voiceSample->audio.getNumSamples();
     const auto range = sampleRange(sampleCount - 2);
 
-    const bool frozen =
-    settings.sampleMode == 2;
+    const bool frozen = settings.sampleMode == 2;
+
+    if (timeStretch && (timeStretchFinished || grainScanPosition >= range.end))
+        return;
 
     if (! frozen && settings.grainMotion == 1)
 {
@@ -684,24 +662,68 @@ const double centre =
               range.end,
               grainScanPosition);
 
-    const double randomOffset =
+    const double randomOffset = timeStretch ? 0.0 :
         (double) (rng.nextFloat() * 2.0f - 1.0f)
         * settings.grainSpread
         * range.length();
 
-    available->position =
+    double grainPosition =
         juce::jlimit(
             range.start,
             range.end,
             centre + randomOffset);
 
+    // Preserve the detected fundamental's phase across overlap boundaries.
+    // This prevents the grain envelope from pulling sustained notes sharp/flat.
+    if (timeStretch && settings.stretchMode == 0
+        && voiceSample->detectedMidiNote >= 0)
+    {
+        const double detectedMidi = voiceSample->detectedMidiNote
+                                  + voiceSample->detectedCents / 100.0;
+        const double detectedHz = 440.0 * std::exp2((detectedMidi - 69.0) / 12.0);
+        const double period = voiceSample->sampleRate / detectedHz;
+        const double desiredPhasePosition = stretchOutputSamples * increment;
+        grainPosition = desiredPhasePosition
+                      + std::round((grainPosition - desiredPhasePosition) / period) * period;
+        grainPosition = juce::jlimit(range.start, range.end, grainPosition);
+    }
+
+    // For transient material, snap the grain to the strongest nearby onset.
+    // This keeps attacks crisp while the overlap-add timeline changes speed.
+    if (timeStretch && settings.stretchMode > 0)
+    {
+        const int radius = juce::roundToInt(
+            voiceSample->sampleRate * (settings.stretchMode == 2 ? 0.012 : 0.006));
+        const int centreIndex = (int) grainPosition;
+        const int first = juce::jmax((int) range.start + 1, centreIndex - radius);
+        const int last = juce::jmin((int) range.end - 1, centreIndex + radius);
+        float strongest = 0.0f;
+        int onset = centreIndex;
+        for (int i = first; i <= last; ++i)
+        {
+            const float delta = std::abs(voiceSample->audio.getSample(0, i)
+                                       - voiceSample->audio.getSample(0, i - 1));
+            if (delta > strongest)
+            {
+                strongest = delta;
+                onset = i;
+            }
+        }
+        grainPosition = (double) onset;
+    }
+
+    available->position = grainPosition;
+
     available->increment = increment;
     available->age = 0;
+    const float grainSeconds = timeStretch
+                                 ? (settings.stretchMode == 2 ? 0.032f : 0.060f)
+                                 : settings.grainSize;
     available->length =
         juce::jmax(
             2,
             juce::roundToInt(
-                settings.grainSize * getSampleRate()));
+                grainSeconds * getSampleRate()));
     available->pan =
     (rng.nextFloat() * 2.0f - 1.0f)
     * settings.grainStereo;
@@ -709,19 +731,22 @@ const double centre =
     available->active = true;
 }
 
-    void renderGranular(double increment, float& left, float& right)
+    void renderGranular(double increment, double scanIncrement,
+                        float& left, float& right)
 {
     if (voiceSample == nullptr || ! voiceSample->isValid())
         return;
 
+    const bool timeStretch = settings.sampleMode == 0;
     samplesUntilNextGrain -= 1.0;
 
     if (samplesUntilNextGrain <= 0.0)
     {
-        startGrain(increment);
+        startGrain(increment, timeStretch);
 
-        const double density =
-            juce::jmax(1.0, (double) settings.grainDensity);
+        const double density = timeStretch
+                                 ? (settings.stretchMode == 2 ? 62.5 : 33.333333)
+                                 : juce::jmax(1.0, (double) settings.grainDensity);
 
         samplesUntilNextGrain +=
             juce::jmax(1.0, getSampleRate() / density);
@@ -734,7 +759,9 @@ const double centre =
             1,
             voiceSample->audio.getNumChannels() - 1);
 
-    const float overlap =
+    const float overlap = timeStretch
+                            ? 1.0f
+                            :
         juce::jmax(
             1.0f,
             settings.grainSize * settings.grainDensity);
@@ -812,7 +839,14 @@ const double centre =
         ++grain.age;
     }
 
-    if (settings.sampleMode == 1 && sampleCount > 1)
+    if (timeStretch && sampleCount > 1)
+    {
+        stretchOutputSamples += 1.0;
+        grainScanPosition += scanIncrement;
+        if (grainScanPosition >= range.end)
+            timeStretchFinished = true;
+    }
+    else if (settings.sampleMode == 1 && sampleCount > 1)
     {
         const double scanStart = range.start;
         const double scanEnd = range.end;
@@ -828,7 +862,7 @@ const double centre =
 
             case 2: // Drift
                 grainScanPosition +=
-                    increment * grainScanDirection;
+                    scanIncrement * grainScanDirection;
 
                 if (grainScanPosition >= scanEnd)
                 {
@@ -850,7 +884,7 @@ const double centre =
                 break;
 
             case 3: // Reverse
-                grainScanPosition -= increment;
+                grainScanPosition -= scanIncrement;
 
                 if (grainScanPosition < scanStart)
                     grainScanPosition += scanLength;
@@ -858,7 +892,7 @@ const double centre =
 
             case 4: // Bounce
                 grainScanPosition +=
-                    increment * grainScanDirection;
+                    scanIncrement * grainScanDirection;
 
                 if (grainScanPosition >= scanEnd)
                 {
@@ -879,7 +913,7 @@ const double centre =
 
             case 0: // Forward
             default:
-                grainScanPosition += increment;
+                grainScanPosition += scanIncrement;
 
                 if (grainScanPosition >= scanEnd)
                 {

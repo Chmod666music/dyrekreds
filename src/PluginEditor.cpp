@@ -41,6 +41,9 @@ const char* tipFor(const juce::String& id)
         { pid::bzDensity,  "Grains per second of the snowstorm layer" },
         { pid::bzPitch,    "Centre frequency of the grains" },
         { pid::bzSpread,   "Random pitch and stereo scatter of the grains" },
+        { pid::sampleSpeed,"Playback duration without changing pitch" },
+        { pid::samplePitch,"Sample transposition without changing duration" },
+        { pid::stretchMode,"Transient preservation for time-stretched samples" },
         { pid::revPre,     "Predelay before the cavern answers" },
         { pid::revShimmer, "Feeds the tail back one octave up: a spectral choir rising" },
         { pid::arpMode,    "Arpeggiator pattern; Off disables it" },
@@ -77,10 +80,10 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
         auto& r1 = knobRow(s);
         addKnob(r1, pid::osc1Oct, "Octave");
         addKnob(r1, pid::osc1Uni, "Unison");
-        addKnob(r1, pid::osc1Det, "Detune");
+        addKnob(r1, pid::osc1Det, "Detune", 0.72f);
         addKnob(r1, pid::fmAmt, "FM");
         auto& r2 = knobRow(s);
-        addKnob(r2, pid::osc1Spread, "Spread");
+        addKnob(r2, pid::osc1Spread, "Spread", 0.72f);
         addKnob(r2, pid::osc1PW, "PW");
         addKnob(r2, pid::osc1Morph, "Morph");
         addKnob(r2, pid::osc1Lvl, "Level");
@@ -92,28 +95,37 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
         addKnob(r1, pid::osc2Oct, "Octave");
         addKnob(r1, pid::osc2Semi, "Semi");
         addKnob(r1, pid::osc2Uni, "Unison");
-        addKnob(r1, pid::osc2Det, "Detune");
+        addKnob(r1, pid::osc2Det, "Detune", 0.72f);
         auto& r2 = knobRow(s);
-        addKnob(r2, pid::osc2Spread, "Spread");
+        addKnob(r2, pid::osc2Spread, "Spread", 0.72f);
         addKnob(r2, pid::osc2PW, "PW");
         addKnob(r2, pid::osc2Morph, "Morph");
         addKnob(r2, pid::osc2Lvl, "Level");
     }
     {
-        auto& s = addSection("Sources", { 588, 80, 280, 238 });
-        auto& c1 = comboRow(s);
-        addCombo(c1, pid::subWave);
-        addCombo(c1, pid::subOct);
+        auto& s = addSection("Sub / Noise", { 588, 80, 112, 238 });
+        auto& sub = comboRow(s);
+        addCombo(sub, pid::subWave);
+        addCombo(sub, pid::subOct);
+        addCombo(comboRow(s), pid::noiseType);
 
-        auto& c2 = comboRow(s);
-        addCombo(c2, pid::noiseType);
-        addCombo(c2, pid::sampleMode);
+        auto& levels = knobRow(s);
+        addKnob(levels, pid::subLvl, "Sub");
+        addKnob(levels, pid::noiseLvl, "Noise");
+    }
+    {
+        auto& s = addSection("Sample", { 708, 80, 160, 238 });
+        auto& modes = comboRow(s);
+        addCombo(modes, pid::sampleMode);
+        addCombo(modes, pid::stretchMode);
 
-        auto& r = knobRow(s);
-        addKnob(r, pid::subLvl, "Sub");
-        addKnob(r, pid::noiseLvl, "Noise");
-        addKnob(r, pid::sampleLvl, "Sample");
-        addKnob(r, pid::sampleRoot, "Root");
+        auto& source = knobRow(s);
+        addKnob(source, pid::sampleLvl, "Sample");
+        addKnob(source, pid::sampleRoot, "Root");
+
+        auto& playback = knobRow(s);
+        addKnob(playback, pid::sampleSpeed, "Speed");
+        addKnob(playback, pid::samplePitch, "Pitch");
     }
     {
         auto& s = addSection("Filter", { 876, 80, 332, 238 });
@@ -168,7 +180,7 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
         auto& s = addSection("Perform / Ring", { 932, 324, 276, 144 });
         addCombo(comboRow(s), pid::voiceMode);
         auto& r = knobRow(s);
-        addKnob(r, pid::glide, "Glide");
+        addKnob(r, pid::glide, "Glide", 1.55f);
         addKnob(r, pid::bendRange, "Bend");
         addKnob(r, pid::rmFreq, "RM Freq");
         addKnob(r, pid::rmMix, "RM Mix");
@@ -375,7 +387,7 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
                                              : juce::String("Sample"));
 
         sampleButton.setTooltip(
-            hasSample ? "Loaded sample: " + name
+            hasSample ? "Loaded sample: " + name + "\n" + processorRef.getSampleAnalysis()
                       : juce::String("Load a WAV, AIFF or MP3 sample"));
     };
 
@@ -626,7 +638,8 @@ GaldrAudioProcessorEditor::Row& GaldrAudioProcessorEditor::knobRow(Section& s)
     return r;
 }
 
-void GaldrAudioProcessorEditor::addKnob(Row& row, const char* paramID, const juce::String& name)
+void GaldrAudioProcessorEditor::addKnob(Row& row, const char* paramID, const juce::String& name,
+                                        float width)
 {
     auto* k = knobs.add(new Knob());
     k->slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
@@ -643,6 +656,7 @@ void GaldrAudioProcessorEditor::addKnob(Row& row, const char* paramID, const juc
     sliderAttachments.push_back(std::make_unique<SliderAttachment>(processorRef.apvts, paramID, k->slider));
     row.comps.push_back(&k->slider);
     row.labels.push_back(&k->label);
+    row.widths.push_back(juce::jmax(0.1f, width));
 }
 
 void GaldrAudioProcessorEditor::addCombo(Row& row, const char* paramID)
@@ -657,6 +671,7 @@ void GaldrAudioProcessorEditor::addCombo(Row& row, const char* paramID)
     comboAttachments.push_back(std::make_unique<ComboBoxAttachment>(processorRef.apvts, paramID, *c));
     row.comps.push_back(c);
     row.labels.push_back(nullptr);
+    row.widths.push_back(1.0f);
 }
 
 void GaldrAudioProcessorEditor::addHSlider(Row& row, const char* paramID)
@@ -671,6 +686,7 @@ void GaldrAudioProcessorEditor::addHSlider(Row& row, const char* paramID)
     sliderAttachments.push_back(std::make_unique<SliderAttachment>(processorRef.apvts, paramID, *s));
     row.comps.push_back(s);
     row.labels.push_back(nullptr);
+    row.widths.push_back(1.0f);
 }
 
 void GaldrAudioProcessorEditor::layoutSection(Section& s, float scale)
@@ -686,16 +702,31 @@ void GaldrAudioProcessorEditor::layoutSection(Section& s, float scale)
     int y = s.bounds.getY() + sc(20);
     for (auto& row : s.rows)
     {
-        const int h = row.tall ? sc(94) : sc(28);
+        const int tallRows = (int) std::count_if(s.rows.begin(), s.rows.end(),
+                                                [](const Row& r) { return r.tall; });
+        const int shortRows = (int) s.rows.size() - tallRows;
+        const int availableBodyHeight = s.bounds.getHeight() - sc(20)
+                                      - shortRows * (sc(28) + 2);
+        const int tallHeight = tallRows > 0
+                                 ? juce::jmin(sc(94), availableBodyHeight / tallRows - 2)
+                                 : sc(94);
+        const int h = row.tall ? juce::jmax(sc(58), tallHeight) : sc(28);
         const int n = (int) row.comps.size();
         if (n == 0)
             continue;
-        const int cw = (s.bounds.getWidth() - sc(12)) / n;
+        const int availableWidth = s.bounds.getWidth() - sc(12);
         const int x0 = s.bounds.getX() + sc(6);
+        const float totalWeight = std::accumulate(row.widths.begin(), row.widths.end(), 0.0f);
+        int usedWidth = 0;
 
         for (int i = 0; i < n; ++i)
         {
-            juce::Rectangle<int> cell(x0 + i * cw, y, cw, h);
+            const int cw = i == n - 1
+                               ? availableWidth - usedWidth
+                               : juce::roundToInt(availableWidth * row.widths[(size_t) i]
+                                                  / totalWeight);
+            juce::Rectangle<int> cell(x0 + usedWidth, y, cw, h);
+            usedWidth += cw;
             if (row.tall)
             {
                 row.labels[(size_t) i]->setBounds(cell.removeFromTop(sc(16)));
