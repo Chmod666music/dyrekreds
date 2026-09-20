@@ -12,7 +12,7 @@ application. Development began on 21 August 2026.
 
 ## Project status
 
-Dyrekreds 0.9 Beta 3 is a public beta. The plugin is functional and tested
+Dyrekreds 0.9 Beta 4 is a public beta. The plugin is functional and tested
 automatically on Linux, Windows and macOS, but additional testing across DAWs,
 hardware and real-world projects is welcome before the 1.0 release.
 
@@ -20,8 +20,7 @@ Dyrekreds is derived from Galdr, while establishing its own product identity,
 plugin IDs, preset directory and expanding sound engine. Dyrekreds and Galdr
 can be installed side by side.
 
-Beta 3 adds MP3 sample loading support and continues development of the sample
-workflow, GUI resizing and cross-platform compatibility.
+Beta 4 adds pitch-aware sample time stretching with independent Speed and Pitch controls, plus Smooth, Transient and Percussive stretch modes. It also includes the sample-workflow, GUI-resizing and cross-platform improvements developed through the earlier beta releases.
 
 ## Features
 
@@ -35,6 +34,8 @@ workflow, GUI resizing and cross-platform compatibility.
 - MPE-friendly pitch bend and pressure
 - Scala `.scl` microtuning
 - WAV, AIFF and MP3 sample import with pitch-tracked playback
+- Pitch-aware sample time stretching with independent Speed and Pitch controls (-24 to +24 semitones)
+- Smooth, Transient and Percussive stretch modes
 - Draggable Sample Start/End controls
 - Granular and freeze modes with five grain-motion patterns
 - Interactive sample waveform with realtime playhead and scrubbing
@@ -64,10 +65,10 @@ Requirements:
 - A C++20 compiler
 - JUCE’s platform-specific build dependencies
 
-For the current Beta 3 test build, clone the `beta3` branch and its submodules:
+For the current Beta 4 development build, clone the `dyrekreds` branch and its submodules:
 
 ```sh
-git clone --branch beta3 --recurse-submodules https://github.com/Chmod666music/dyrekreds.git
+git clone --branch dyrekreds --recurse-submodules https://github.com/Chmod666music/dyrekreds.git
 cd dyrekreds
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release --parallel
