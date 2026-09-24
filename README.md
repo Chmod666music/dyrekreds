@@ -7,24 +7,20 @@
 [Galdr](https://github.com/andreademurtas/galdr), originally created by
 Andrea De Murtas.
 
-Dyrekreds is currently at **v0.9.0-beta.7** and is available as VST3, CLAP,
-AU on macOS, and a standalone application. Development began on 21 August 2026.
+Dyrekreds is currently available as VST3, CLAP, AU on macOS, and a standalone
+application. Development began on 21 August 2026.
 
 ## Project status
 
-**Dyrekreds 0.9 Beta 7** is the current public-development beta. The plugin is
-functional and tested automatically on Linux, Windows and macOS, but additional
-testing across DAWs, hardware and real-world projects is welcome before the 1.0
-release.
+Dyrekreds 0.9 Beta 4 is a public beta. The plugin is functional and tested
+automatically on Linux, Windows and macOS, but additional testing across DAWs,
+hardware and real-world projects is welcome before the 1.0 release.
 
-Dyrekreds is derived from Galdr while establishing its own product identity,
+Dyrekreds is derived from Galdr, while establishing its own product identity,
 plugin IDs, preset directory and expanding sound engine. Dyrekreds and Galdr
 can be installed side by side.
 
-The current Beta 7 line includes the sample-workflow, GUI-resizing and
-cross-platform improvements developed throughout the beta series, together with
-pitch-aware sample time stretching, independent Speed and Pitch controls, and
-Smooth, Transient and Percussive stretch modes.
+Beta 4 adds pitch-aware sample time stretching with independent Speed and Pitch controls, plus Smooth, Transient and Percussive stretch modes. It also includes the sample-workflow, GUI-resizing and cross-platform improvements developed through the earlier beta releases.
 
 ## Features
 
@@ -52,11 +48,9 @@ Smooth, Transient and Percussive stretch modes.
 
 ## Downloads and testing
 
-Published pre-release packages for Linux, Windows and macOS are available from:
+Pre-release builds for Linux, Windows and macOS are available from:
 
 https://github.com/Chmod666music/dyrekreds/releases
-
-The `dyrekreds` branch tracks the current **Beta 7** development line.
 
 Testing feedback is also welcome on the Dyrekreds Discord:
 
@@ -71,8 +65,7 @@ Requirements:
 - A C++20 compiler
 - JUCE’s platform-specific build dependencies
 
-For the current Beta 7 development build, clone the `dyrekreds` branch and its
-submodules:
+For the current Beta 4 development build, clone the `dyrekreds` branch and its submodules:
 
 ```sh
 git clone --branch dyrekreds --recurse-submodules https://github.com/Chmod666music/dyrekreds.git
@@ -88,8 +81,8 @@ Build artifacts are written to `build/Dyrekreds_artefacts/Release/`:
 
 | Artifact | Install location |
 |---|---|
-| `VST3/Dyrekreds.vst3` | Windows: `C:\\Program Files\\Common Files\\VST3` · macOS: `~/Library/Audio/Plug-Ins/VST3` · Linux: `~/.vst3` |
-| `CLAP/Dyrekreds.clap` | Windows: `C:\\Program Files\\Common Files\\CLAP` · macOS: `~/Library/Audio/Plug-Ins/CLAP` · Linux: `~/.clap` |
+| `VST3/Dyrekreds.vst3` | Windows: `C:\Program Files\Common Files\VST3` · macOS: `~/Library/Audio/Plug-Ins/VST3` · Linux: `~/.vst3` |
+| `CLAP/Dyrekreds.clap` | Windows: `C:\Program Files\Common Files\CLAP` · macOS: `~/Library/Audio/Plug-Ins/CLAP` · Linux: `~/.clap` |
 | `AU/Dyrekreds.component` | macOS only: `~/Library/Audio/Plug-Ins/Components` |
 | `Standalone/Dyrekreds` | Run directly without plugin installation |
 
