@@ -31,9 +31,10 @@ can be installed side by side.
 - Tempo-synchronised arpeggiator, LFOs, tremolo and delay
 - MPE-friendly pitch bend and pressure
 - Scala `.scl` microtuning
-- WAV and AIFF sample import with pitch-tracked playback
+- WAV, AIFF and MP3 sample import with pitch-tracked playback
 - Granular and freeze modes with five grain-motion patterns
-- Interactive sample waveform with realtime playhead and scrubbing
+- Interactive sample waveform with zoom, pan, precise Start/End selection,
+  realtime playhead and scrubbing
 - Distortion, bitcrusher, ring modulation, chorus, delay and reverb
 - Granular “Blizzard” texture layer
 - Preset browser with 27 factory presets inherited from Galdr

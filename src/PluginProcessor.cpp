@@ -1136,6 +1136,18 @@ void GaldrAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
         applyStateTree(tree);
 }
 
+void GaldrAudioProcessor::setLastEditorSize(int width, int height) noexcept
+{
+    editorWidth.store(width, std::memory_order_relaxed);
+    editorHeight.store(height, std::memory_order_relaxed);
+}
+
+juce::Point<int> GaldrAudioProcessor::getLastEditorSize() const noexcept
+{
+    return { editorWidth.load(std::memory_order_relaxed),
+             editorHeight.load(std::memory_order_relaxed) };
+}
+
 juce::ValueTree GaldrAudioProcessor::capturePresetState()
 {
     auto tree = apvts.copyState();
@@ -1174,6 +1186,8 @@ juce::ValueTree GaldrAudioProcessor::capturePresetState()
 juce::ValueTree GaldrAudioProcessor::captureFullState()
 {
     auto tree = capturePresetState();
+    tree.setProperty("editorWidth", editorWidth.load(std::memory_order_relaxed), nullptr);
+    tree.setProperty("editorHeight", editorHeight.load(std::memory_order_relaxed), nullptr);
     juce::ValueTree map("MIDIMAP");
     for (int cc = 0; cc < 128; ++cc)
         if (auto* p = midiCCMap[cc].load())
@@ -1198,6 +1212,12 @@ void GaldrAudioProcessor::applyStateTree(juce::ValueTree tree)
         return;
 
     migrateState(tree, (int) tree.getProperty("stateVersion", 0));
+    if (tree.hasProperty("editorWidth") && tree.hasProperty("editorHeight"))
+        setLastEditorSize((int) tree.getProperty("editorWidth"),
+                          (int) tree.getProperty("editorHeight"));
+
+    tree.removeProperty("editorWidth", nullptr);
+    tree.removeProperty("editorHeight", nullptr);
     const bool restoresSample =
         (bool) tree.getProperty("hasSampleState", false);
 

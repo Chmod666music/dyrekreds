@@ -43,6 +43,9 @@ public:
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
+    void setLastEditorSize(int width, int height) noexcept;
+    juce::Point<int> getLastEditorSize() const noexcept;
+
     bool loadTuning(const juce::File& sclFile);
     void resetTuning();
     juce::String getTuningName() const { return tuning.name; }
@@ -79,7 +82,7 @@ public:
     // Versioned state. captureFullState is what the host stores; preset files
     // use capturePresetState (no MIDI map: controller setup is not a sound).
     // applyStateTree migrates old versions and restores tuning and mappings.
-    static constexpr int stateVersion = 5;
+    static constexpr int stateVersion = 6;
     juce::ValueTree captureFullState();
     juce::ValueTree capturePresetState();
     void applyStateTree(juce::ValueTree tree);
@@ -120,6 +123,8 @@ private:
     std::shared_ptr<const dyrekreds::SampleData> sampleData;
     std::atomic<float> granularPlayhead { 0.0f };
     std::atomic<bool> granularVoiceActive { false };
+    std::atomic<int> editorWidth { 813 };
+    std::atomic<int> editorHeight { 673 };
 
     // MIDI CC -> parameter map, written on the message thread, read per block.
     std::atomic<juce::RangedAudioParameter*> midiCCMap[128] {};

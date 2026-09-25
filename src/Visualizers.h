@@ -212,6 +212,7 @@ private:
 };
 
     class SampleWaveformComponent : public juce::Component,
+                                public juce::SettableTooltipClient,
                                 private juce::Timer
 {
     public:
@@ -225,17 +226,18 @@ private:
     SampleProvider sampleProvider,
     PlayheadProvider playheadProvider,
     juce::RangedAudioParameter& position,
-    juce::RangedAudioParameter& spread,
+    juce::RangedAudioParameter& spreadParam,
     juce::RangedAudioParameter& sampleStart,
     juce::RangedAudioParameter& sampleEnd)
     : getSample(std::move(sampleProvider)),
       getPlayhead(std::move(playheadProvider)),
       positionParameter(position),
-      spreadParameter(spread),
+      spreadParameter(spreadParam),
       startParameter(sampleStart),
       endParameter(sampleEnd)
 {
     setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
+    setTooltip("Wheel: zoom | Shift+wheel: scroll | Alt/middle drag: pan | Double-click: reset zoom");
     startTimerHz(30);
 }
 
@@ -248,6 +250,8 @@ private:
     {
         displayedSample = sample;
         waveform.clear();
+        zoom = 1.0f;
+        viewStart = 0.0f;
 
         if (sample != nullptr && sample->isValid())
             buildWaveform(*sample);
@@ -273,11 +277,11 @@ private:
 
     void buildWaveform(const dyrekreds::SampleData& sample)
     {
-        constexpr int points = 512;
         const int sampleCount = sample.audio.getNumSamples();
         const int channels = sample.audio.getNumChannels();
+        const int points = juce::jlimit(2, 8192, sampleCount);
 
-        waveform.reserve(points);
+        waveform.reserve((size_t) points);
 
         for (int point = 0; point < points; ++point)
         {
@@ -351,20 +355,20 @@ private:
         1.0f,
         playhead + spread);
 
-    const float rangeStartX = bounds.getX() + rangeStart * bounds.getWidth();
-    const float rangeEndX = bounds.getX() + rangeEnd * bounds.getWidth();
+    const float rangeStartX = samplePositionToX(rangeStart, bounds);
+    const float rangeEndX = samplePositionToX(rangeEnd, bounds);
 
     g.setColour(juce::Colours::black.withAlpha(0.48f));
-    g.fillRect(bounds.withRight(rangeStartX));
-    g.fillRect(bounds.withLeft(rangeEndX));
+    if (rangeStartX > bounds.getX())
+        g.fillRect(bounds.withRight(juce::jmin(bounds.getRight(), rangeStartX)));
+    if (rangeEndX < bounds.getRight())
+        g.fillRect(bounds.withLeft(juce::jmax(bounds.getX(), rangeEndX)));
 
     const float spreadX =
-    bounds.getX()
-    + spreadStart * bounds.getWidth();
+    samplePositionToX(spreadStart, bounds);
 
     const float spreadWidth =
-    (spreadEnd - spreadStart)
-    * bounds.getWidth();
+    (spreadEnd - spreadStart) / viewLength() * bounds.getWidth();
 
     g.setColour(theme::blood.withAlpha(0.14f));
     g.fillRect(
@@ -388,15 +392,18 @@ private:
         const float centreY = bounds.getCentreY();
         const float halfHeight = bounds.getHeight() * 0.43f;
 
-        for (size_t i = 0; i < waveform.size(); ++i)
+        const auto firstPoint = juce::jlimit<size_t>(
+            0, waveform.size() - 1,
+            (size_t) std::floor(viewStart * (float) (waveform.size() - 1)));
+        const auto lastPoint = juce::jlimit<size_t>(
+            firstPoint, waveform.size() - 1,
+            (size_t) std::ceil((viewStart + viewLength())
+                               * (float) (waveform.size() - 1)));
+
+        for (size_t i = firstPoint; i <= lastPoint; ++i)
         {
-            const float x =
-                juce::jmap(
-                    (float) i,
-                    0.0f,
-                    (float) (waveform.size() - 1),
-                    bounds.getX(),
-                    bounds.getRight());
+            const float position = (float) i / (float) (waveform.size() - 1);
+            const float x = samplePositionToX(position, bounds);
 
             const float height = waveform[i] * halfHeight;
 
@@ -409,8 +416,7 @@ private:
 
         g.setColour(theme::bloodBright.withAlpha(0.90f));
         g.strokePath(path, juce::PathStrokeType(1.0f));
-        const float playheadX =
-    bounds.getX() + playhead * bounds.getWidth();
+    const float playheadX = samplePositionToX(playhead, bounds);
 
     g.setColour(theme::blood.withAlpha(0.30f));
     g.drawLine(
@@ -440,16 +446,28 @@ private:
     g.fillPath(marker);
 
     g.setColour(theme::boneDim.withAlpha(0.9f));
-    g.drawVerticalLine(juce::roundToInt(rangeStartX),
-                       bounds.getY(), bounds.getBottom());
-    g.drawVerticalLine(juce::roundToInt(rangeEndX),
-                       bounds.getY(), bounds.getBottom());
+    if (bounds.contains(rangeStartX, bounds.getCentreY()))
+        g.drawVerticalLine(juce::roundToInt(rangeStartX),
+                           bounds.getY(), bounds.getBottom());
+    if (bounds.contains(rangeEndX, bounds.getCentreY()))
+        g.drawVerticalLine(juce::roundToInt(rangeEndX),
+                           bounds.getY(), bounds.getBottom());
 
     constexpr float handleWidth = 5.0f;
-    g.fillRect(rangeStartX - handleWidth * 0.5f, bounds.getY(),
-               handleWidth, 12.0f);
-    g.fillRect(rangeEndX - handleWidth * 0.5f, bounds.getY(),
-               handleWidth, 12.0f);
+    if (bounds.contains(rangeStartX, bounds.getCentreY()))
+        g.fillRect(rangeStartX - handleWidth * 0.5f, bounds.getY(),
+                   handleWidth, 12.0f);
+    if (bounds.contains(rangeEndX, bounds.getCentreY()))
+        g.fillRect(rangeEndX - handleWidth * 0.5f, bounds.getY(),
+                   handleWidth, 12.0f);
+
+    if (zoom > 1.001f)
+    {
+        g.setFont(10.0f);
+        g.setColour(theme::boneDim.withAlpha(0.75f));
+        g.drawText(juce::String(zoom, 1) + "x", getLocalBounds().reduced(5),
+                   juce::Justification::topRight);
+    }
     }
     void mouseDown(const juce::MouseEvent& event) override
 {
@@ -457,8 +475,17 @@ private:
         return;
 
     const auto bounds = getLocalBounds().toFloat().reduced(1.0f);
-    const auto startX = bounds.getX() + rangeStart * bounds.getWidth();
-    const auto endX = bounds.getX() + rangeEnd * bounds.getWidth();
+    if (event.mods.isMiddleButtonDown() || event.mods.isAltDown())
+    {
+        dragTarget = DragTarget::pan;
+        panStart = viewStart;
+        panMouseDownX = event.x;
+        setMouseCursor(juce::MouseCursor::DraggingHandCursor);
+        return;
+    }
+
+    const auto startX = samplePositionToX(rangeStart, bounds);
+    const auto endX = samplePositionToX(rangeEnd, bounds);
 
     if (std::abs((float) event.x - startX) <= 8.0f)
         dragTarget = DragTarget::start;
@@ -476,6 +503,15 @@ private:
     if (displayedSample == nullptr)
         return;
 
+    if (dragTarget == DragTarget::pan)
+    {
+        const float delta = (float) (panMouseDownX - event.x)
+                            / juce::jmax(1.0f, (float) getWidth()) * viewLength();
+        viewStart = juce::jlimit(0.0f, 1.0f - viewLength(), panStart + delta);
+        repaint();
+        return;
+    }
+
     updateFromMouse(event.x);
 }
 
@@ -483,10 +519,47 @@ private:
 {
     if (displayedSample != nullptr && dragTarget != DragTarget::none)
     {
-        activeParameter().endChangeGesture();
+        if (dragTarget != DragTarget::pan)
+            activeParameter().endChangeGesture();
         dragTarget = DragTarget::none;
+        setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
     }
 }
+
+    void mouseDoubleClick(const juce::MouseEvent&) override
+    {
+        zoom = 1.0f;
+        viewStart = 0.0f;
+        repaint();
+    }
+
+    void mouseWheelMove(const juce::MouseEvent& event,
+                        const juce::MouseWheelDetails& wheel) override
+    {
+        if (displayedSample == nullptr)
+            return;
+
+        if (event.mods.isShiftDown() || std::abs(wheel.deltaX) > std::abs(wheel.deltaY))
+        {
+            const float amount = std::abs(wheel.deltaX) > std::abs(wheel.deltaY)
+                                     ? wheel.deltaX : wheel.deltaY;
+            viewStart = juce::jlimit(0.0f, 1.0f - viewLength(),
+                                     viewStart - amount * viewLength() * 0.35f);
+        }
+        else
+        {
+            const auto bounds = getLocalBounds().toFloat().reduced(1.0f);
+            const float anchor = xToSamplePosition((float) event.x, bounds);
+            const float anchorFraction = ((float) event.x - bounds.getX())
+                                         / juce::jmax(1.0f, bounds.getWidth());
+            zoom = juce::jlimit(1.0f, maximumZoom,
+                                zoom * std::pow(2.0f, wheel.deltaY * 2.0f));
+            viewStart = juce::jlimit(0.0f, 1.0f - viewLength(),
+                                     anchor - anchorFraction * viewLength());
+        }
+
+        repaint();
+    }
 
     juce::RangedAudioParameter& activeParameter() noexcept
     {
@@ -502,12 +575,7 @@ private:
     const auto bounds =
         getLocalBounds().toFloat().reduced(1.0f);
 
-    const float normalised =
-        juce::jlimit(
-            0.0f,
-            1.0f,
-            ((float) mouseX - bounds.getX())
-                / juce::jmax(1.0f, bounds.getWidth()));
+    const float normalised = xToSamplePosition((float) mouseX, bounds);
 
     constexpr float minimumRange = 0.001f;
     if (dragTarget == DragTarget::start)
@@ -527,6 +595,20 @@ private:
             juce::jlimit(0.0f, 1.0f, (normalised - rangeStart) / selectedLength));
     }
 }
+
+    float viewLength() const noexcept { return 1.0f / zoom; }
+
+    float xToSamplePosition(float x, juce::Rectangle<float> bounds) const noexcept
+    {
+        const float fraction = juce::jlimit(0.0f, 1.0f,
+            (x - bounds.getX()) / juce::jmax(1.0f, bounds.getWidth()));
+        return viewStart + fraction * viewLength();
+    }
+
+    float samplePositionToX(float position, juce::Rectangle<float> bounds) const noexcept
+    {
+        return bounds.getX() + (position - viewStart) / viewLength() * bounds.getWidth();
+    }
     SampleProvider getSample;
     PlayheadProvider getPlayhead;
     juce::RangedAudioParameter& positionParameter;
@@ -539,7 +621,12 @@ private:
     float spread = 0.0f;
     float rangeStart = 0.0f;
     float rangeEnd = 1.0f;
-    enum class DragTarget { none, position, start, end };
+    static constexpr float maximumZoom = 64.0f;
+    float zoom = 1.0f;
+    float viewStart = 0.0f;
+    float panStart = 0.0f;
+    int panMouseDownX = 0;
+    enum class DragTarget { none, position, start, end, pan };
     DragTarget dragTarget = DragTarget::none;
 };
 } // namespace galdr

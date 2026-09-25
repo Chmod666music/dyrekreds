@@ -479,10 +479,14 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
     setLookAndFeel(&lnf);
     tooltipWindow.setLookAndFeel(&lnf);
 
+    // Read this before installing the constrainer: setResizeLimits may resize an
+    // uninitialised editor and must not overwrite the processor's saved size.
+    const auto savedSize = processorRef.getLastEditorSize();
     setResizable(true, false);
     getConstrainer()->setFixedAspectRatio((double) baseW / (double) baseH);
     setResizeLimits(baseW * 2 / 3, baseH * 2 / 3, baseW * 2, baseH * 2);
-    setSize(baseW * 2 / 3, baseH * 2 / 3);
+    setSize(juce::jlimit(baseW * 2 / 3, baseW * 2, savedSize.x),
+            juce::jlimit(baseH * 2 / 3, baseH * 2, savedSize.y));
 
     setWantsKeyboardFocus(true);
     startTimerHz(4);
@@ -745,6 +749,7 @@ void GaldrAudioProcessorEditor::layoutSection(Section& s, float scale)
 
 void GaldrAudioProcessorEditor::resized()
 {
+    processorRef.setLastEditorSize(getWidth(), getHeight());
     const float scale = (float) getWidth() / (float) baseW;
     lnf.uiScale = scale;
     auto sc = [scale](int v) { return juce::roundToInt((float) v * scale); };

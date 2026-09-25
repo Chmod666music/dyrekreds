@@ -739,6 +739,28 @@ void testStateRoundTrip()
     }
     check(same, "all parameter values survive save/load");
 
+    a.setLastEditorSize(1464, 1212);
+    auto fullState = a.captureFullState();
+    GaldrAudioProcessor editorStateRoundTrip;
+    editorStateRoundTrip.applyStateTree(fullState);
+    check(editorStateRoundTrip.getLastEditorSize() == juce::Point<int>(1464, 1212),
+          "editor size survives a host session round-trip");
+
+    const auto presetState = a.capturePresetState();
+    check(! presetState.hasProperty("editorWidth")
+              && ! presetState.hasProperty("editorHeight"),
+          "editor size is not stored in sound presets");
+
+    std::unique_ptr<juce::AudioProcessorEditor> firstEditor(a.createEditor());
+    firstEditor->setSize(1098, 909);
+    const auto resizedWidth = firstEditor->getWidth();
+    const auto resizedHeight = firstEditor->getHeight();
+    firstEditor.reset();
+    std::unique_ptr<juce::AudioProcessorEditor> reopenedEditor(a.createEditor());
+    check(reopenedEditor->getWidth() == resizedWidth
+              && reopenedEditor->getHeight() == resizedHeight,
+          "editor size survives closing and reopening the editor");
+
     auto tree = b.capturePresetState();
     tree.removeProperty("stateVersion", nullptr);
     b.applyStateTree(tree);
