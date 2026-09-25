@@ -12,7 +12,7 @@ application. Development began on 21 August 2026.
 
 ## Project status
 
-Dyrekreds 0.9 Beta 4 is a public beta. The plugin is functional and tested
+Dyrekreds 0.9 Beta 5 is a public beta. The plugin is functional and tested
 automatically on Linux, Windows and macOS, but additional testing across DAWs,
 hardware and real-world projects is welcome before the 1.0 release.
 
@@ -20,7 +20,7 @@ Dyrekreds is derived from Galdr, while establishing its own product identity,
 plugin IDs, preset directory and expanding sound engine. Dyrekreds and Galdr
 can be installed side by side.
 
-Beta 4 adds pitch-aware sample time stretching with independent Speed and Pitch controls, plus Smooth, Transient and Percussive stretch modes. It also includes the sample-workflow, GUI-resizing and cross-platform improvements developed through the earlier beta releases.
+Beta 5 improves the sample editor with waveform zoom up to 64x, panning and scrolling for precise selection, and improved Sample Start, Sample End and Granular Position controls. The VST3 interface now remembers its resized window, while loaded samples and interface size are restored with saved projects. Beta 4 introduced pitch-aware sample time stretching with independent Speed and Pitch controls and Smooth, Transient and Percussive stretch modes.
 
 ## Features
 
@@ -38,7 +38,9 @@ Beta 4 adds pitch-aware sample time stretching with independent Speed and Pitch 
 - Smooth, Transient and Percussive stretch modes
 - Draggable Sample Start/End controls
 - Granular and freeze modes with five grain-motion patterns
-- Interactive sample waveform with realtime playhead and scrubbing
+- Interactive sample waveform with realtime playhead, scrubbing, zoom up to 64x, panning and scrolling
+- Improved Sample Start, Sample End and Granular Position controls
+- Project restoration of loaded samples and interface size; VST3 remembers its resized window
 - Distortion, bitcrusher, ring modulation, chorus, delay and reverb
 - Granular “Blizzard” texture layer
 - Preset browser with 27 factory presets inherited from Galdr
@@ -65,7 +67,7 @@ Requirements:
 - A C++20 compiler
 - JUCE’s platform-specific build dependencies
 
-For the current Beta 4 development build, clone the `dyrekreds` branch and its submodules:
+For the current Beta 5 development build, clone the `dyrekreds` branch and its submodules:
 
 ```sh
 git clone --branch dyrekreds --recurse-submodules https://github.com/Chmod666music/dyrekreds.git
