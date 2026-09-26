@@ -30,7 +30,7 @@ jobs:
 
       - name: Configure (macOS universal binary)
         if: runner.os == 'macOS'
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=10.15
 
       - name: Configure
         if: runner.os != 'macOS'
@@ -61,6 +61,31 @@ jobs:
             fi
             codesign --force --sign - "$bundle"
             codesign --verify --deep --strict --verbose=2 "$bundle"
+          done
+
+      - name: Verify macOS deployment target
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          for bundle in \
+            build/Dyrekreds_artefacts/Release/VST3/Dyrekreds.vst3 \
+            build/Dyrekreds_artefacts/Release/AU/Dyrekreds.component \
+            build/Dyrekreds_artefacts/Release/CLAP/Dyrekreds.clap; do
+            binary="$bundle/Contents/MacOS/Dyrekreds"
+            for arch in x86_64 arm64; do
+              expected=10.15
+              [ "$arch" = arm64 ] && expected=11.0
+              target=$(otool -arch "$arch" -l "$binary" | awk '
+                /cmd LC_BUILD_VERSION/ { in_build = 1 }
+                in_build && /minos / { print $2; exit }
+                /cmd LC_VERSION_MIN_MACOSX/ { in_min = 1 }
+                in_min && /version / { print $2; exit }
+              ')
+              if [ "$target" != "$expected" ]; then
+                echo "Unexpected deployment target for $binary ($arch): $target (expected $expected)" >&2
+                exit 1
+              fi
+            done
           done
 
       - name: Run unit tests
