@@ -8,6 +8,34 @@ namespace
 constexpr int baseW = 1220;
 constexpr int baseH = 1010;
 
+juce::File sampleFolderPreference()
+{
+    return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+        .getChildFile("Fuimadane")
+        .getChildFile("Dyrekreds")
+        .getChildFile("last-sample-folder.txt");
+}
+
+juce::File lastSampleFolder()
+{
+    const auto path = sampleFolderPreference().loadFileAsString().trim();
+    if (path.isNotEmpty())
+    {
+        const juce::File folder(path);
+        if (folder.isDirectory())
+            return folder;
+    }
+    return juce::File::getSpecialLocation(juce::File::userMusicDirectory);
+}
+
+void rememberSampleFolder(const juce::File& sample)
+{
+    const auto folder = sample.getParentDirectory();
+    if (folder.isDirectory()
+        && sampleFolderPreference().getParentDirectory().createDirectory().wasOk())
+        sampleFolderPreference().replaceWithText(folder.getFullPathName());
+}
+
 const char* tipFor(const juce::String& id)
 {
     static const std::map<juce::String, const char*> tips = {
@@ -419,8 +447,7 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
                 {
                     sampleChooser = std::make_unique<juce::FileChooser>(
                         "Load sample",
-                        juce::File::getSpecialLocation(
-                            juce::File::userMusicDirectory),
+                        lastSampleFolder(),
                         "*.wav;*.aif;*.aiff;*.mp3");
 
                     sampleChooser->launchAsync(
@@ -439,6 +466,7 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
 
                             if (loadResult)
                             {
+                                rememberSampleFolder(file);
                                 updateSampleButton();
                             }
                             else

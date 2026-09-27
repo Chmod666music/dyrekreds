@@ -9,6 +9,7 @@
 #include <functional>
 #include "BlackMetalLookAndFeel.h"
 #include "SampleData.h"
+#include "SampleWaveform.h"
 
 namespace galdr
 {
@@ -254,7 +255,7 @@ private:
         viewStart = 0.0f;
 
         if (sample != nullptr && sample->isValid())
-            buildWaveform(*sample);
+            waveform = dyrekreds::buildSampleWaveform(*sample);
     }
 
     playhead = juce::jlimit(
@@ -274,44 +275,6 @@ private:
 
     repaint();
 }
-
-    void buildWaveform(const dyrekreds::SampleData& sample)
-    {
-        const int sampleCount = sample.audio.getNumSamples();
-        const int channels = sample.audio.getNumChannels();
-        const int points = juce::jlimit(2, 8192, sampleCount);
-
-        waveform.reserve((size_t) points);
-
-        for (int point = 0; point < points; ++point)
-        {
-            const int start =
-                point * sampleCount / points;
-
-            const int end =
-                juce::jmax(
-                    start + 1,
-                    (point + 1) * sampleCount / points);
-
-            float peak = 0.0f;
-
-            for (int channel = 0; channel < channels; ++channel)
-            {
-                const auto range =
-                    sample.audio.findMinMax(
-                        channel,
-                        start,
-                        juce::jmin(sampleCount, end) - start);
-
-                peak = juce::jmax(
-                    peak,
-                    std::abs(range.getStart()),
-                    std::abs(range.getEnd()));
-            }
-
-            waveform.push_back(peak);
-        }
-    }
 
     void paint(juce::Graphics& g) override
     {
