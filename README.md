@@ -12,7 +12,7 @@ application. Development began on 21 August 2026.
 
 ## Project status
 
-Dyrekreds 0.9 Beta 5 is a public beta. The plugin is functional and tested
+Dyrekreds 0.9 Beta 6 is a public beta. The plugin is functional and tested
 automatically on Linux, Windows and macOS, but additional testing across DAWs,
 hardware and real-world projects is welcome before the 1.0 release.
 
@@ -20,7 +20,9 @@ Dyrekreds is derived from Galdr, while establishing its own product identity,
 plugin IDs, preset directory and expanding sound engine. Dyrekreds and Galdr
 can be installed side by side.
 
-Beta 5 improves the sample editor with waveform zoom up to 64x, panning and scrolling for precise selection, and improved Sample Start, Sample End and Granular Position controls. The VST3 interface now remembers its resized window, while loaded samples and interface size are restored with saved projects. Beta 4 introduced pitch-aware sample time stretching with independent Speed and Pitch controls and Smooth, Transient and Percussive stretch modes.
+Beta 6 fixes a sample waveform indexing overflow that could cause extreme peaks or crashes when loading samples in some hosts. The sample browser now remembers the last folder used. macOS builds target macOS 10.15 or newer on Intel and macOS 11.0 or newer on Apple Silicon. Demo MP3 files are no longer bundled in the download packages.
+
+Beta 5 added waveform zoom up to 64x, panning and scrolling for precise selection, improved Sample Start, Sample End and Granular Position controls, and VST3 window size recall. Beta 4 introduced pitch-aware sample time stretching with independent Speed and Pitch controls and Smooth, Transient and Percussive stretch modes.
 
 ## Features
 
@@ -34,6 +36,7 @@ Beta 5 improves the sample editor with waveform zoom up to 64x, panning and scro
 - MPE-friendly pitch bend and pressure
 - Scala `.scl` microtuning
 - WAV, AIFF and MP3 sample import with pitch-tracked playback
+- Sample browser remembers the last folder used
 - Pitch-aware sample time stretching with independent Speed and Pitch controls (-24 to +24 semitones)
 - Smooth, Transient and Percussive stretch modes
 - Draggable Sample Start/End controls
@@ -50,9 +53,11 @@ Beta 5 improves the sample editor with waveform zoom up to 64x, panning and scro
 
 ## Downloads and testing
 
-Pre-release builds for Linux, Windows and macOS are available from:
+Download Beta 6 for Linux, Windows and macOS:
 
-https://github.com/Chmod666music/dyrekreds/releases
+https://github.com/Chmod666music/dyrekreds/releases/tag/v0.9.0-beta.6
+
+Packages: `Dyrekreds-Beta6-Linux.tar.gz`, `Dyrekreds-Beta6-Windows.zip` and `Dyrekreds-Beta6-macOS.tar.gz`. These packages do not include demo MP3 files. Sample import still supports MP3.
 
 Testing feedback is also welcome on the Dyrekreds Discord:
 
@@ -67,10 +72,10 @@ Requirements:
 - A C++20 compiler
 - JUCE’s platform-specific build dependencies
 
-For the current Beta 5 development build, clone the `dyrekreds` branch and its submodules:
+To build the exact Beta 6 release, clone its tag and submodules:
 
 ```sh
-git clone --branch dyrekreds --recurse-submodules https://github.com/Chmod666music/dyrekreds.git
+git clone --branch v0.9.0-beta.6 --recurse-submodules https://github.com/Chmod666music/dyrekreds.git
 cd dyrekreds
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release --parallel
