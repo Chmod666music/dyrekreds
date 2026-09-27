@@ -7,12 +7,14 @@
 // Exits non-zero on failure; run by CI on every platform.
 
 #include <juce_audio_utils/juce_audio_utils.h>
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <utility>
 #include <vector>
 #include "../src/PluginProcessor.h"
 #include "../src/Presets.h"
+#include "../src/SampleWaveform.h"
 
 namespace
 {
@@ -206,6 +208,29 @@ bool allFinite(const std::vector<float>& v, float& worst)
     }
     return ok;
 }
+void testLongSampleWaveform()
+{
+    // 8192 * 1,000,000 overflows a 32-bit int in the old waveform code.
+    dyrekreds::SampleData sample;
+    sample.audio.setSize(2, 1000000);
+    sample.audio.clear();
+    sample.audio.setSample(0, 750000, 0.75f);
+    sample.audio.setSample(1, 900000, -0.5f);
+
+    const auto peaks = dyrekreds::buildSampleWaveform(sample);
+    check(peaks.size() == 8192, "long sample waveform has 8192 points");
+    if (peaks.size() == 8192)
+    {
+        check(std::abs(peaks[6144] - 0.75f) < 1.0e-6f,
+              "waveform shows impulse at the correct position");
+        check(std::abs(peaks[7372] - 0.5f) < 1.0e-6f,
+              "waveform includes the second channel");
+        check(std::count_if(peaks.begin(), peaks.end(),
+                            [](float peak) { return peak > 0.0f; }) == 2,
+              "waveform has no false spikes from integer overflow");
+    }
+}
+
 void testSampleLoading()
 {
     std::cout << "sample loading" << std::endl;
@@ -1174,6 +1199,7 @@ int main()
     juce::ScopedJuceInitialiser_GUI juceInit;
     std::cout << "Dyrekreds headless" << std::endl;
 
+    testLongSampleWaveform();
     testSampleLoading();
     testStateRoundTrip();
     testMidiLearn();
