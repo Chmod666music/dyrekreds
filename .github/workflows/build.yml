@@ -51,7 +51,10 @@ jobs:
           au="$stage/AU/Dyrekreds.component"
           app="$stage/Standalone/Dyrekreds.app"
           test -f "$vst3/Contents/Resources/moduleinfo.json"
-          python3 -c 'import json, pathlib, sys; json.load(pathlib.Path(sys.argv[1]).open())' "$vst3/Contents/Resources/moduleinfo.json"
+          # The VST3 specification defines moduleinfo.json as JSON5.  Use its
+          # reference parser so valid trailing commas are accepted while the
+          # required VST3 manifest schema is still checked.
+          ./build/DyrekredsVST3ManifestValidator "$vst3/Contents/Resources/moduleinfo.json"
           for binary in "$vst3/Contents/MacOS/Dyrekreds" "$au/Contents/MacOS/Dyrekreds" "$app/Contents/MacOS/Dyrekreds"; do
             test -x "$binary"
             architectures="$(lipo -archs "$binary")"

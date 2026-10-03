@@ -66,6 +66,16 @@ target_link_libraries(Dyrekreds
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags)
 
+# Validate generated VST3 manifests with the parser supplied by Steinberg's
+# VST3 SDK.  moduleinfo.json is JSON5 by specification, so a strict JSON
+# parser would reject valid manifests that contain trailing commas.
+add_executable(DyrekredsVST3ManifestValidator
+    tools/ValidateVST3ModuleInfo.cpp
+    JUCE/modules/juce_audio_processors_headless/format_types/VST3_SDK/public.sdk/source/vst/moduleinfo/moduleinfoparser.cpp)
+target_compile_features(DyrekredsVST3ManifestValidator PRIVATE cxx_std_17)
+target_include_directories(DyrekredsVST3ManifestValidator PRIVATE
+    JUCE/modules/juce_audio_processors_headless/format_types/VST3_SDK)
+
 # Headless DSP tests, run by CI on every platform.
 juce_add_console_app(DyrekredsTests PRODUCT_NAME "DyrekredsTests")
 target_sources(DyrekredsTests PRIVATE
