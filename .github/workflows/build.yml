@@ -127,6 +127,7 @@ jobs:
           MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
         run: |
           certificate="$RUNNER_TEMP/developer-id.p12"
+          compatible_certificate="$RUNNER_TEMP/developer-id-compatible.p12"
           keychain="$RUNNER_TEMP/dyrekreds-signing.keychain-db"
           if ! printf '%s' "$MACOS_CERTIFICATE_BASE64" | base64 --decode > "$certificate"; then
             echo "MACOS_CERTIFICATE_BASE64 is not valid base64." >&2
@@ -140,10 +141,24 @@ jobs:
             echo "The decoded P12 cannot be opened with MACOS_CERTIFICATE_PASSWORD. Replace MACOS_CERTIFICATE_BASE64 and MACOS_CERTIFICATE_PASSWORD together from one fresh P12 export." >&2
             exit 1
           fi
+          # security(1) on the hosted macOS images can reject newer PKCS#12
+          # PBES2/AES containers even though OpenSSL verifies their MAC.  Keep
+          # the certificate and private key, but re-wrap them with the
+          # long-supported PKCS#12 algorithms accepted by Security.framework.
+          # Nothing is printed: both the source and temporary re-wrapped P12
+          # stay in RUNNER_TEMP and retain the existing secret password.
+          set -o pipefail
+          if ! openssl pkcs12 -in "$certificate" -passin env:MACOS_CERTIFICATE_PASSWORD -nodes 2>/dev/null \
+            | openssl pkcs12 -export -out "$compatible_certificate" -passout env:MACOS_CERTIFICATE_PASSWORD \
+                -keypbe PBE-SHA1-3DES -certpbe PBE-SHA1-3DES -macalg sha1 > /dev/null 2>&1; then
+            echo "Could not re-wrap the decoded P12 in the macOS-compatible PKCS#12 format." >&2
+            exit 1
+          fi
+          test -s "$compatible_certificate" || { echo "The macOS-compatible P12 is empty." >&2; exit 1; }
           security create-keychain -p "" "$keychain"
           security set-keychain-settings -lut 21600 "$keychain"
           security unlock-keychain -p "" "$keychain"
-          security import "$certificate" -k "$keychain" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security import "$compatible_certificate" -k "$keychain" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
           if ! security find-identity -v -p codesigning "$keychain" | grep -F -- "\"$MACOS_SIGNING_IDENTITY\"" > /dev/null; then
             echo "The imported P12 does not contain the MACOS_SIGNING_IDENTITY codesigning identity." >&2
             exit 1
