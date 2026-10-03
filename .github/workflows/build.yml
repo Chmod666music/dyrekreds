@@ -124,14 +124,30 @@ jobs:
         env:
           MACOS_CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
           MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
         run: |
           certificate="$RUNNER_TEMP/developer-id.p12"
           keychain="$RUNNER_TEMP/dyrekreds-signing.keychain-db"
-          echo "$MACOS_CERTIFICATE_BASE64" | base64 --decode > "$certificate"
+          if ! printf '%s' "$MACOS_CERTIFICATE_BASE64" | base64 --decode > "$certificate"; then
+            echo "MACOS_CERTIFICATE_BASE64 is not valid base64." >&2
+            exit 1
+          fi
+          test -s "$certificate" || { echo "MACOS_CERTIFICATE_BASE64 decoded to an empty file." >&2; exit 1; }
+          # Check the PKCS#12 MAC before creating a keychain.  This makes a
+          # mismatched export password or a wrong/corrupt P12 explicit without
+          # logging either secret.
+          if ! openssl pkcs12 -in "$certificate" -passin env:MACOS_CERTIFICATE_PASSWORD -noout > /dev/null 2>&1; then
+            echo "The decoded P12 cannot be opened with MACOS_CERTIFICATE_PASSWORD. Replace MACOS_CERTIFICATE_BASE64 and MACOS_CERTIFICATE_PASSWORD together from one fresh P12 export." >&2
+            exit 1
+          fi
           security create-keychain -p "" "$keychain"
           security set-keychain-settings -lut 21600 "$keychain"
           security unlock-keychain -p "" "$keychain"
           security import "$certificate" -k "$keychain" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          if ! security find-identity -v -p codesigning "$keychain" | grep -F -- "\"$MACOS_SIGNING_IDENTITY\"" > /dev/null; then
+            echo "The imported P12 does not contain the MACOS_SIGNING_IDENTITY codesigning identity." >&2
+            exit 1
+          fi
           security list-keychain -d user -s "$keychain"
           security set-key-partition-list -S apple-tool:,apple: -s -k "" "$keychain"
 
