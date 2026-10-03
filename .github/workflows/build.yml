@@ -39,6 +39,26 @@ jobs:
       - name: Build
         run: cmake --build build --config Release --parallel
 
+      # Catch the exact packaging faults that make a VST3 invisible to a DAW:
+      # missing manifest, an incomplete bundle, or an architecture omitted
+      # from a supposedly universal macOS build.
+      - name: Inspect macOS plug-in bundles
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          stage=build/Dyrekreds_artefacts/Release
+          vst3="$stage/VST3/Dyrekreds.vst3"
+          au="$stage/AU/Dyrekreds.component"
+          app="$stage/Standalone/Dyrekreds.app"
+          test -f "$vst3/Contents/Resources/moduleinfo.json"
+          plutil -lint "$vst3/Contents/Resources/moduleinfo.json"
+          for binary in "$vst3/Contents/MacOS/Dyrekreds" "$au/Contents/MacOS/Dyrekreds" "$app/Contents/MacOS/Dyrekreds"; do
+            test -x "$binary"
+            architectures="$(lipo -archs "$binary")"
+            echo "$architectures" | grep -qw arm64
+            echo "$architectures" | grep -qw x86_64
+          done
+
       - name: Run unit tests
         shell: bash
         run: |
@@ -76,7 +96,50 @@ jobs:
           mkdir -p ~/Library/Audio/Plug-Ins/Components
           cp -R "build/Dyrekreds_artefacts/Release/AU/Dyrekreds.component" ~/Library/Audio/Plug-Ins/Components/
           killall -9 AudioComponentRegistrar 2>/dev/null || true
+          auval -v aumu Dyrk Fuim
           pluginval.app/Contents/MacOS/pluginval --strictness-level 10 --validate ~/Library/Audio/Plug-Ins/Components/Dyrekreds.component
+
+      # Public macOS releases must be signed and notarised.  Pull requests and
+      # branch builds remain unsigned, which keeps contributors from needing
+      # access to the release credentials.
+      - name: Require macOS release credentials
+        if: runner.os == 'macOS' && startsWith(github.ref, 'refs/tags/v')
+        env:
+          MACOS_CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          for value in MACOS_CERTIFICATE_BASE64 MACOS_CERTIFICATE_PASSWORD MACOS_SIGNING_IDENTITY APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+            test -n "${!value}" || { echo "Missing required macOS release secret: $value" >&2; exit 1; }
+          done
+
+      - name: Install macOS signing certificate
+        if: runner.os == 'macOS' && startsWith(github.ref, 'refs/tags/v')
+        env:
+          MACOS_CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          certificate="$RUNNER_TEMP/developer-id.p12"
+          keychain="$RUNNER_TEMP/dyrekreds-signing.keychain-db"
+          echo "$MACOS_CERTIFICATE_BASE64" | base64 --decode > "$certificate"
+          security create-keychain -p "" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "" "$keychain"
+          security import "$certificate" -k "$keychain" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security list-keychain -d user -s "$keychain"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" "$keychain"
+
+      - name: Sign and notarise macOS release bundles
+        if: runner.os == 'macOS' && startsWith(github.ref, 'refs/tags/v')
+        env:
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: scripts/sign-and-notarise-macos.sh build/Dyrekreds_artefacts/Release
 
       # pluginval has no CLAP support; clap-validator is the free-audio tool.
       # Pinned to an exact release asset because the names carry a build suffix.

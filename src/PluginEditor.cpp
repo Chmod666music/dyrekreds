@@ -732,8 +732,17 @@ void GaldrAudioProcessorEditor::resized()
     presetNameButton.setBounds(sc(baseW - 276), sc(20), sc(240), sc(26));
     presetNext.setBounds(sc(baseW - 32), sc(20), sc(20), sc(26));
 
+    // AU hosts such as Live draw their native resize affordance over the
+    // bottom-right of the editor.  Do not let the keyboard cover that hit
+    // area: apart from hiding the affordance, an interactive child in that
+    // corner can swallow the host's resize mouse-down.  Keep a generous
+    // bottom/right gutter at every supported scale instead.
+    constexpr int keyboardRightGutter = 32;
+    constexpr int keyboardBottomGutter = 20;
     keyboard.setKeyWidth(16.0f * scale);
-    keyboard.setBounds(sc(12), sc(934), getWidth() - sc(24), sc(70));
+    keyboard.setBounds(sc(12), getHeight() - sc(keyboardBottomGutter + 58),
+                       getWidth() - sc(12 + keyboardRightGutter),
+                       sc(58));
 
     presetBrowser->setBounds(getLocalBounds());
 

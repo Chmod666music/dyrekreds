@@ -5,6 +5,19 @@ project(Dyrekreds VERSION 0.9.0)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Release builds must work in both current Apple-Silicon hosts and older Intel
+# hosts.  Keep this in the project, rather than only in CI, so a local macOS
+# release build cannot accidentally ship a single-architecture plug-in.
+# A caller may still deliberately override either cache variable.
+if(APPLE)
+    set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING
+        "Architectures to build for macOS")
+    # Apple-Silicon plug-ins require macOS 11 or newer; using that deployment
+    # target also keeps the universal binary's two slices compatible.
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING
+        "Minimum macOS version for the universal build")
+endif()
+
 add_subdirectory(JUCE)
 
 # GUI fonts, embedded into the binary. Both are licensed under the SIL OFL
