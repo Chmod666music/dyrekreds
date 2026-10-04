@@ -12,7 +12,7 @@ application. Development began on 21 August 2026.
 
 ## Project status
 
-Dyrekreds 0.9 Beta 14 is a public beta. The plugin is built, tested and
+Dyrekreds 0.9 Beta 15 is a public beta. The plugin is built, tested and
 validated automatically on Linux, Windows and macOS, but additional testing
 across DAWs, hardware and real-world projects is welcome before the 1.0
 release.
@@ -21,17 +21,17 @@ Dyrekreds is derived from Galdr, while establishing its own product identity,
 plugin IDs, preset directory and expanding sound engine. Dyrekreds and Galdr
 can be installed side by side.
 
-Beta 14 is the first public release with the complete macOS release path
+Beta 15 replaces the withdrawn Beta 14 release. Beta 14 accidentally omitted
+parts of the newer sample workflow; please use Beta 15 instead. Beta 15 restores
+the complete sample experience, including MP3 import, waveform zoom and
+pan/scroll, precise Sample Start and End controls, time stretching, granular
+features and saved editor size.
+
+Beta 15 is the first public release with the complete macOS release path
 verified in CI: universal Intel and Apple Silicon bundles, VST3 and AU
 validation, Developer ID signing, Apple notarisation and stapling. macOS builds
 target macOS 10.15 or newer on Intel and macOS 11.0 or newer on Apple Silicon.
-Demo MP3 files are no longer bundled in the download packages.
-
-Beta 6 fixed a sample waveform indexing overflow that could cause extreme peaks
-or crashes when loading samples in some hosts. The sample browser remembers the
-last folder used.
-
-Beta 5 added waveform zoom up to 64x, panning and scrolling for precise selection, improved Sample Start, Sample End and Granular Position controls, and VST3 window size recall. Beta 4 introduced pitch-aware sample time stretching with independent Speed and Pitch controls and Smooth, Transient and Percussive stretch modes.
+Release packages contain plug-ins and documentation only — no demo MP3 files.
 
 ## Features
 
@@ -62,14 +62,15 @@ Beta 5 added waveform zoom up to 64x, panning and scrolling for precise selectio
 
 ## Downloads and testing
 
-Download Beta 14 for Linux, Windows and macOS:
+Download Beta 15 for Linux, Windows and macOS:
 
-https://github.com/Chmod666music/dyrekreds/releases/tag/v0.9.0-beta.14
+https://github.com/Chmod666music/dyrekreds/releases/tag/v0.9.0-beta.15
 
-Packages: `Dyrekreds-Linux.tar.gz`, `Dyrekreds-Windows.zip` and
-`Dyrekreds-macOS.tar.gz`. The macOS package contains signed and notarised VST3,
-CLAP, AU and standalone builds. These packages do not include demo MP3 files.
-Sample import still supports MP3.
+Packages: `Dyrekreds-v0.9.0-beta.15-Linux.tar.gz`,
+`Dyrekreds-v0.9.0-beta.15-Windows.zip` and
+`Dyrekreds-v0.9.0-beta.15-macOS.tar.gz`. The macOS package contains signed and
+notarised VST3, CLAP, AU and standalone builds. These packages do not include
+demo MP3 files; sample import still supports MP3.
 
 Testing feedback is also welcome on the Dyrekreds Discord:
 
@@ -84,10 +85,10 @@ Requirements:
 - A C++20 compiler
 - JUCE’s platform-specific build dependencies
 
-To build the exact Beta 14 release, clone its tag and submodules:
+To build the exact Beta 15 release, clone its tag and submodules:
 
 ```sh
-git clone --branch v0.9.0-beta.14 --recurse-submodules https://github.com/Chmod666music/dyrekreds.git
+git clone --branch v0.9.0-beta.15 --recurse-submodules https://github.com/Chmod666music/dyrekreds.git
 cd dyrekreds
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release --parallel
