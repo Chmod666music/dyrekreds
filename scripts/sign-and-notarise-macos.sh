@@ -35,5 +35,12 @@ for bundle in "${bundles[@]}"; do
         --password "$APPLE_APP_SPECIFIC_PASSWORD" \
         --team-id "$APPLE_TEAM_ID"
     xcrun stapler staple "$bundle"
-    spctl --assess --type execute --verbose=4 "$bundle"
+    xcrun stapler validate "$bundle"
+
+    # Gatekeeper's executable assessment is for applications and command-line
+    # tools.  VST3 and Audio Unit bundles are still notarised and stapled above,
+    # but are not applications and are rejected by `spctl --type execute`.
+    if [[ "$bundle" == *.app ]]; then
+        spctl --assess --type execute --verbose=4 "$bundle"
+    fi
 done
