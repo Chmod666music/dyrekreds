@@ -50,10 +50,22 @@ public:
     static constexpr size_t maximumEncodedBytes =
         64u * 1024u * 1024u;
 
+    static bool isSupportedFile(const juce::File& file)
+    {
+        const auto extension = file.getFileExtension().toLowerCase();
+        return extension == ".wav"
+            || extension == ".aif"
+            || extension == ".aiff"
+            || extension == ".mp3";
+    }
+
     static SampleLoadResult load(const juce::File& file)
     {
         if (! file.existsAsFile())
             return { {}, "The selected sample file does not exist." };
+
+        if (! isSupportedFile(file))
+            return { {}, "Choose a WAV, AIFF or MP3 sample." };
 
         if (file.getSize()
             > (juce::int64) maximumEncodedBytes)
@@ -111,7 +123,7 @@ private:
             formats.createReaderFor(std::move(stream)));
 
         if (reader == nullptr)
-            return { {}, "The data is not a supported WAV or AIFF sample." };
+            return { {}, "The data is not a supported WAV, AIFF or MP3 sample." };
 
         if (reader->sampleRate <= 0.0
             || reader->lengthInSamples <= 0

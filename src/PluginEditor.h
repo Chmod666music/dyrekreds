@@ -71,6 +71,8 @@ private:
     void layoutSection(Section&, float scale);
 
     void showParamMenu(GaldrSlider&, const juce::String& paramID);
+    void updateSampleButton();
+    void loadSampleFile(const juce::File& file);
     void timerCallback() override;
 
     void drawRidge(juce::Graphics&, float baseY, float amplitude, int seedStep,

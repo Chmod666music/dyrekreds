@@ -212,7 +212,8 @@ private:
 };
 
     class SampleWaveformComponent : public juce::Component,
-                                private juce::Timer
+                                    public juce::FileDragAndDropTarget,
+                                    private juce::Timer
 {
     public:
     using SampleProvider =
@@ -220,6 +221,9 @@ private:
 
     using PlayheadProvider =
     std::function<float()>;
+
+    using FileDropHandler =
+    std::function<void(const juce::File&)>;
 
     SampleWaveformComponent(
     SampleProvider sampleProvider,
@@ -234,6 +238,39 @@ private:
     setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
     startTimerHz(30);
 }
+
+    void setFileDropHandler(FileDropHandler handler)
+    {
+        onFileDropped = std::move(handler);
+    }
+
+    bool isInterestedInFileDrag(
+        const juce::StringArray& files) override
+    {
+        return findSupportedFile(files).existsAsFile();
+    }
+
+    void fileDragEnter(const juce::StringArray& files, int, int) override
+    {
+        dragOver = findSupportedFile(files).existsAsFile();
+        repaint();
+    }
+
+    void fileDragExit(const juce::StringArray&) override
+    {
+        dragOver = false;
+        repaint();
+    }
+
+    void filesDropped(const juce::StringArray& files, int, int) override
+    {
+        const auto file = findSupportedFile(files);
+        dragOver = false;
+        repaint();
+
+        if (file.existsAsFile() && onFileDropped)
+            onFileDropped(file);
+    }
 
     private:
     void timerCallback() override
@@ -327,6 +364,8 @@ private:
                 "NO SAMPLE LOADED",
                 getLocalBounds(),
                 juce::Justification::centred);
+
+            drawDropOverlay(g);
 
             return;
         }
@@ -422,6 +461,36 @@ private:
     bounds.getY() + 6.0f);
 
     g.fillPath(marker);
+    drawDropOverlay(g);
+    }
+
+    void drawDropOverlay(juce::Graphics& g) const
+    {
+        if (! dragOver)
+            return;
+
+        auto bounds = getLocalBounds().toFloat().reduced(2.0f);
+        g.setColour(theme::blood.withAlpha(0.72f));
+        g.fillRect(bounds);
+        g.setColour(theme::bloodBright);
+        g.drawRect(bounds, 2.0f);
+        g.setFont(12.0f);
+        g.setColour(theme::bone);
+        g.drawText("DROP WAV, AIFF OR MP3 SAMPLE",
+                   getLocalBounds(),
+                   juce::Justification::centred);
+    }
+
+    static juce::File findSupportedFile(const juce::StringArray& files)
+    {
+        for (const auto& path : files)
+        {
+            const juce::File file(path);
+            if (dyrekreds::SampleLoader::isSupportedFile(file))
+                return file;
+        }
+
+        return {};
     }
     void mouseDown(const juce::MouseEvent& event) override
 {
@@ -466,6 +535,8 @@ private:
     juce::RangedAudioParameter& spreadParameter;
     std::shared_ptr<const dyrekreds::SampleData> displayedSample;
     std::vector<float> waveform;
+    FileDropHandler onFileDropped;
+    bool dragOver = false;
     float playhead = 0.0f;
     float spread = 0.0f;
 };

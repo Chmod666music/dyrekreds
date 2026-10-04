@@ -65,6 +65,8 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
     spectrum(p.spectrumFifo, [&p] { return p.getSampleRate(); })
 {
     sections.reserve(24);
+    sampleWaveform.setFileDropHandler(
+        [this](const juce::File& file) { loadSampleFile(file); });
 
     // ---- row 1: sound sources and filter
     {
@@ -360,26 +362,9 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
     };
     addAndMakeVisible(tuningButton);
     // ---- sample source
-    const auto updateSampleButton = [this]
-    {
-        const auto name = processorRef.getSampleName();
-        const bool hasSample = name.isNotEmpty();
-
-        const auto loadedMarker =
-            juce::String("Sample ")
-            + juce::String::charToString(0x2022);
-
-        sampleButton.setButtonText(hasSample ? loadedMarker
-                                             : juce::String("Sample"));
-
-        sampleButton.setTooltip(
-            hasSample ? "Loaded sample: " + name
-                      : juce::String("Load a WAV or AIFF sample"));
-    };
-
     updateSampleButton();
 
-    sampleButton.onClick = [this, updateSampleButton]
+    sampleButton.onClick = [this]
     {
         juce::PopupMenu menu;
         menu.setLookAndFeel(&lnf);
@@ -394,12 +379,12 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
                      false,
                      false);
         menu.addSeparator();
-        menu.addItem(1, "Load WAV or AIFF...");
+        menu.addItem(1, "Load WAV, AIFF or MP3...");
         menu.addItem(2, "Clear sample", hasSample);
 
         menu.showMenuAsync(
             juce::PopupMenu::Options().withTargetComponent(sampleButton),
-            [this, updateSampleButton](int menuResult)
+            [this](int menuResult)
             {
                 if (menuResult == 1)
                 {
@@ -407,33 +392,15 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
                         "Load sample",
                         juce::File::getSpecialLocation(
                             juce::File::userMusicDirectory),
-                        "*.wav;*.aif;*.aiff");
+                        "*.wav;*.aif;*.aiff;*.mp3");
 
                     sampleChooser->launchAsync(
                         juce::FileBrowserComponent::openMode
                             | juce::FileBrowserComponent::canSelectFiles,
-                        [this, updateSampleButton](
+                        [this](
                             const juce::FileChooser& fc)
                         {
-                            const auto file = fc.getResult();
-
-                            if (! file.existsAsFile())
-                                return;
-
-                            const auto loadResult =
-                                processorRef.loadSample(file);
-
-                            if (loadResult)
-                            {
-                                updateSampleButton();
-                            }
-                            else
-                            {
-                                juce::AlertWindow::showMessageBoxAsync(
-                                    juce::MessageBoxIconType::WarningIcon,
-                                    "Sample import failed",
-                                    loadResult.error);
-                            }
+                            loadSampleFile(fc.getResult());
                         });
                 }
                 else if (menuResult == 2)
@@ -474,10 +441,46 @@ GaldrAudioProcessorEditor::GaldrAudioProcessorEditor(GaldrAudioProcessor& p)
     startTimerHz(4);
 }
 
-    GaldrAudioProcessorEditor::~GaldrAudioProcessorEditor()
+GaldrAudioProcessorEditor::~GaldrAudioProcessorEditor()
 {
     tooltipWindow.setLookAndFeel(nullptr);
     setLookAndFeel(nullptr);
+}
+
+void GaldrAudioProcessorEditor::updateSampleButton()
+{
+    const auto name = processorRef.getSampleName();
+    const bool hasSample = name.isNotEmpty();
+
+    const auto loadedMarker =
+        juce::String("Sample ")
+        + juce::String::charToString(0x2022);
+
+    sampleButton.setButtonText(hasSample ? loadedMarker
+                                         : juce::String("Sample"));
+    sampleButton.setTooltip(
+        hasSample ? "Loaded sample: " + name
+                  : juce::String("Load a WAV, AIFF or MP3 sample"));
+}
+
+void GaldrAudioProcessorEditor::loadSampleFile(const juce::File& file)
+{
+    if (! file.existsAsFile())
+        return;
+
+    const auto loadResult = processorRef.loadSample(file);
+
+    if (loadResult)
+    {
+        updateSampleButton();
+    }
+    else
+    {
+        juce::AlertWindow::showMessageBoxAsync(
+            juce::MessageBoxIconType::WarningIcon,
+            "Sample import failed",
+            loadResult.error);
+    }
 }
 
     void GaldrAudioProcessorEditor::timerCallback()

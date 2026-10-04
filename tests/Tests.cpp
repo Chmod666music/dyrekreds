@@ -176,6 +176,15 @@ void testSampleLoading()
 {
     std::cout << "sample loading" << std::endl;
 
+    juce::AudioFormatManager formats;
+    formats.registerBasicFormats();
+    check(formats.findFormatForFileExtension("mp3") != nullptr,
+          "MP3 decoder is registered");
+
+    check(dyrekreds::SampleLoader::isSupportedFile(
+              juce::File("sample.mp3")),
+          "MP3 files are accepted by the sample loader");
+
     constexpr double sampleRate = 48000.0;
     constexpr int numSamples = 4800;
 
