@@ -142,16 +142,17 @@ jobs:
             exit 1
           fi
           # security(1) on the hosted macOS images can reject newer PKCS#12
-          # PBES2/AES containers even though OpenSSL verifies their MAC.  Keep
-          # the certificate and private key, but re-wrap them with the
-          # long-supported PKCS#12 algorithms accepted by Security.framework.
+          # PBES2/AES containers even though OpenSSL verifies their MAC. Keep
+          # the certificate and private key, but re-wrap them using this
+          # runner's OpenSSL defaults. This avoids requesting a named legacy
+          # PBE that is not available in every macOS runner OpenSSL build.
           # Nothing is printed: both the source and temporary re-wrapped P12
           # stay in RUNNER_TEMP and retain the existing secret password.
           set -o pipefail
           if ! openssl pkcs12 -in "$certificate" -passin env:MACOS_CERTIFICATE_PASSWORD -nodes 2>/dev/null \
-            | openssl pkcs12 -export -out "$compatible_certificate" -passout env:MACOS_CERTIFICATE_PASSWORD \
-                -keypbe PBE-SHA1-3DES -certpbe PBE-SHA1-3DES -macalg sha1 > /dev/null 2>&1; then
+            | openssl pkcs12 -export -out "$compatible_certificate" -passout env:MACOS_CERTIFICATE_PASSWORD > /dev/null 2>&1; then
             echo "Could not re-wrap the decoded P12 in the macOS-compatible PKCS#12 format." >&2
+            openssl version >&2
             exit 1
           fi
           test -s "$compatible_certificate" || { echo "The macOS-compatible P12 is empty." >&2; exit 1; }
