@@ -127,11 +127,11 @@ jobs:
           MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
         run: |
           certificate="$RUNNER_TEMP/developer-id.p12"
-          compatible_certificate="$RUNNER_TEMP/developer-id-compatible.p12"
           rewrap_error="$RUNNER_TEMP/developer-id-rewrap.err"
           leaf_certificate="$RUNNER_TEMP/developer-id-leaf.pem"
           private_key="$RUNNER_TEMP/developer-id-key.pem"
-          certificate_chain="$RUNNER_TEMP/developer-id-chain.pem"
+          clean_leaf_certificate="$RUNNER_TEMP/developer-id-leaf-clean.pem"
+          clean_private_key="$RUNNER_TEMP/developer-id-key-clean.pem"
           keychain="$RUNNER_TEMP/dyrekreds-signing.keychain-db"
           if ! printf '%s' "$MACOS_CERTIFICATE_BASE64" | base64 --decode > "$certificate"; then
             echo "MACOS_CERTIFICATE_BASE64 is not valid base64." >&2
@@ -145,19 +145,13 @@ jobs:
             echo "The decoded P12 cannot be opened with MACOS_CERTIFICATE_PASSWORD. Replace MACOS_CERTIFICATE_BASE64 and MACOS_CERTIFICATE_PASSWORD together from one fresh P12 export." >&2
             exit 1
           fi
-          # security(1) on the hosted macOS images can reject newer PKCS#12
-          # PBES2/AES containers even though OpenSSL verifies their MAC. Keep
-          # the certificate and private key, but re-wrap them using this
-          # runner's OpenSSL defaults. This avoids requesting a named legacy
-          # PBE that is not available in every macOS runner OpenSSL build.
-          # Loading the legacy provider lets OpenSSL 3 decrypt P12 safe bags
-          # encrypted with legacy algorithms before writing the fresh bundle.
-          # Nothing is printed: both the source and temporary re-wrapped P12
-          # stay in RUNNER_TEMP and retain the existing secret password.
-          set -o pipefail
+          # security(1) rejects this P12's MAC even after OpenSSL has read its
+          # key material successfully. Avoid Security.framework's PKCS#12
+          # parser altogether: use OpenSSL only to extract the identity, then
+          # import clean PEM certificate and key files into the temporary
+          # keychain. Nothing is printed and all material stays in RUNNER_TEMP.
           if ! openssl pkcs12 -legacy -in "$certificate" -passin env:MACOS_CERTIFICATE_PASSWORD -clcerts -nokeys -out "$leaf_certificate" 2>"$rewrap_error" \
-            || ! openssl pkcs12 -legacy -in "$certificate" -passin env:MACOS_CERTIFICATE_PASSWORD -nocerts -noenc -out "$private_key" 2>>"$rewrap_error" \
-            || ! openssl pkcs12 -legacy -in "$certificate" -passin env:MACOS_CERTIFICATE_PASSWORD -cacerts -nokeys -out "$certificate_chain" 2>>"$rewrap_error"; then
+            || ! openssl pkcs12 -legacy -in "$certificate" -passin env:MACOS_CERTIFICATE_PASSWORD -nocerts -noenc -out "$private_key" 2>>"$rewrap_error"; then
             echo "Could not extract the certificate material from the decoded P12." >&2
             openssl version >&2
             sed -n '1,20p' "$rewrap_error" >&2
@@ -165,20 +159,18 @@ jobs:
           fi
           test -s "$leaf_certificate" || { echo "The decoded P12 does not contain a leaf certificate." >&2; exit 1; }
           test -s "$private_key" || { echo "The decoded P12 does not contain a private key." >&2; exit 1; }
-          chain_args=()
-          [ -s "$certificate_chain" ] && chain_args=(-certfile "$certificate_chain")
-          if ! openssl pkcs12 -export -out "$compatible_certificate" -passout env:MACOS_CERTIFICATE_PASSWORD \
-            -inkey "$private_key" -in "$leaf_certificate" "${chain_args[@]}" > /dev/null 2>>"$rewrap_error"; then
-            echo "Could not re-wrap the decoded P12 in the macOS-compatible PKCS#12 format." >&2
+          if ! openssl x509 -in "$leaf_certificate" -out "$clean_leaf_certificate" 2>>"$rewrap_error" \
+            || ! openssl pkey -in "$private_key" -out "$clean_private_key" 2>>"$rewrap_error"; then
+            echo "Could not convert the decoded P12 material to clean PEM files." >&2
             openssl version >&2
             sed -n '1,20p' "$rewrap_error" >&2
             exit 1
           fi
-          test -s "$compatible_certificate" || { echo "The macOS-compatible P12 is empty." >&2; exit 1; }
           security create-keychain -p "" "$keychain"
           security set-keychain-settings -lut 21600 "$keychain"
           security unlock-keychain -p "" "$keychain"
-          security import "$compatible_certificate" -k "$keychain" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security import "$clean_leaf_certificate" -k "$keychain" -T /usr/bin/codesign
+          security import "$clean_private_key" -k "$keychain" -T /usr/bin/codesign
           if ! security find-identity -v -p codesigning "$keychain" | grep -F -- "\"$MACOS_SIGNING_IDENTITY\"" > /dev/null; then
             echo "The imported P12 does not contain the MACOS_SIGNING_IDENTITY codesigning identity." >&2
             exit 1
