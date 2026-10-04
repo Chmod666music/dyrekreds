@@ -128,6 +128,7 @@ jobs:
         run: |
           certificate="$RUNNER_TEMP/developer-id.p12"
           compatible_certificate="$RUNNER_TEMP/developer-id-compatible.p12"
+          rewrap_error="$RUNNER_TEMP/developer-id-rewrap.err"
           keychain="$RUNNER_TEMP/dyrekreds-signing.keychain-db"
           if ! printf '%s' "$MACOS_CERTIFICATE_BASE64" | base64 --decode > "$certificate"; then
             echo "MACOS_CERTIFICATE_BASE64 is not valid base64." >&2
@@ -146,13 +147,16 @@ jobs:
           # the certificate and private key, but re-wrap them using this
           # runner's OpenSSL defaults. This avoids requesting a named legacy
           # PBE that is not available in every macOS runner OpenSSL build.
+          # Loading the legacy provider lets OpenSSL 3 decrypt P12 safe bags
+          # encrypted with legacy algorithms before writing the fresh bundle.
           # Nothing is printed: both the source and temporary re-wrapped P12
           # stay in RUNNER_TEMP and retain the existing secret password.
           set -o pipefail
-          if ! openssl pkcs12 -in "$certificate" -passin env:MACOS_CERTIFICATE_PASSWORD -nodes 2>/dev/null \
-            | openssl pkcs12 -export -out "$compatible_certificate" -passout env:MACOS_CERTIFICATE_PASSWORD > /dev/null 2>&1; then
+          if ! openssl pkcs12 -legacy -in "$certificate" -passin env:MACOS_CERTIFICATE_PASSWORD -noenc 2>"$rewrap_error" \
+            | openssl pkcs12 -export -out "$compatible_certificate" -passout env:MACOS_CERTIFICATE_PASSWORD > /dev/null 2>>"$rewrap_error"; then
             echo "Could not re-wrap the decoded P12 in the macOS-compatible PKCS#12 format." >&2
             openssl version >&2
+            sed -n '1,20p' "$rewrap_error" >&2
             exit 1
           fi
           test -s "$compatible_certificate" || { echo "The macOS-compatible P12 is empty." >&2; exit 1; }
