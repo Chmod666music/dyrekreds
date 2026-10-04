@@ -48,6 +48,7 @@ private:
         bool tall = false;                      // knob rows are tall, combo rows are not
         std::vector<juce::Component*> comps;    // sliders or combo boxes
         std::vector<juce::Label*> labels;       // parallel; nullptr for combos
+        std::vector<float> widths;               // relative visual width of each control
     };
 
     struct Section
@@ -65,7 +66,7 @@ private:
                               juce::Component& content);
     Row& comboRow(Section&);
     Row& knobRow(Section&);
-    void addKnob(Row&, const char* paramID, const juce::String& name);
+    void addKnob(Row&, const char* paramID, const juce::String& name, float width = 1.0f);
     void addCombo(Row&, const char* paramID);
     void addHSlider(Row&, const char* paramID);
     void layoutSection(Section&, float scale);

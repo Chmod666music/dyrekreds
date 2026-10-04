@@ -43,6 +43,9 @@ public:
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
+    void setLastEditorSize(int width, int height) noexcept;
+    juce::Point<int> getLastEditorSize() const noexcept;
+
     bool loadTuning(const juce::File& sclFile);
     void resetTuning();
     juce::String getTuningName() const { return tuning.name; }
@@ -51,15 +54,35 @@ public:
     void clearSample();
     std::shared_ptr<const dyrekreds::SampleData> currentSample() const;
     juce::String getSampleName() const;
+    juce::String getSampleAnalysis() const;
     float getGranularPlayhead() const noexcept
 {
     return granularPlayhead.load(std::memory_order_relaxed);
 }
+    float getGranularDisplayPosition() const noexcept
+    {
+        if (granularVoiceActive.load(std::memory_order_relaxed))
+            return getGranularPlayhead();
+
+        if (const auto* position = apvts.getRawParameterValue(pid::grainPosition))
+        {
+            const auto start = apvts.getRawParameterValue(pid::sampleStart)
+                                   ->load(std::memory_order_relaxed);
+            const auto end = apvts.getRawParameterValue(pid::sampleEnd)
+                                 ->load(std::memory_order_relaxed);
+            const auto rangeStart = juce::jmin(start, end);
+            const auto rangeEnd = juce::jmax(start, end);
+            return juce::jmap(position->load(std::memory_order_relaxed),
+                              rangeStart, rangeEnd);
+        }
+
+        return 0.0f;
+    }
 
     // Versioned state. captureFullState is what the host stores; preset files
     // use capturePresetState (no MIDI map: controller setup is not a sound).
     // applyStateTree migrates old versions and restores tuning and mappings.
-    static constexpr int stateVersion = 3;
+    static constexpr int stateVersion = 6;
     juce::ValueTree captureFullState();
     juce::ValueTree capturePresetState();
     void applyStateTree(juce::ValueTree tree);
@@ -99,6 +122,9 @@ private:
     galdr::Tuning tuning;
     std::shared_ptr<const dyrekreds::SampleData> sampleData;
     std::atomic<float> granularPlayhead { 0.0f };
+    std::atomic<bool> granularVoiceActive { false };
+    std::atomic<int> editorWidth { 813 };
+    std::atomic<int> editorHeight { 673 };
 
     // MIDI CC -> parameter map, written on the message thread, read per block.
     std::atomic<juce::RangedAudioParameter*> midiCCMap[128] {};

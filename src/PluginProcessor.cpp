@@ -64,6 +64,12 @@ GaldrAudioProcessor::loadSample(const juce::File& file)
         std::atomic_store_explicit(&sampleData,
                                    result.sample,
                                    std::memory_order_release);
+
+        if (result.sample->detectedMidiNote >= 0)
+            if (auto* root = apvts.getParameter(pid::sampleRoot))
+                root->setValueNotifyingHost(
+                    root->convertTo0to1((float) result.sample->detectedMidiNote));
+
         presetDirty.store(true);
     }
 
@@ -92,6 +98,32 @@ juce::String GaldrAudioProcessor::getSampleName() const
         return sample->name;
 
     return {};
+}
+
+juce::String GaldrAudioProcessor::getSampleAnalysis() const
+{
+    const auto sample = currentSample();
+    if (sample == nullptr)
+        return {};
+
+    juce::String analysis = "Normalised ";
+    analysis += juce::String(juce::Decibels::gainToDecibels(sample->normalisationGain), 1);
+    analysis += " dB";
+
+    if (sample->detectedMidiNote >= 0)
+    {
+        analysis += "; detected ";
+        analysis += juce::MidiMessage::getMidiNoteName(
+            sample->detectedMidiNote, true, true, 4);
+        analysis += sample->detectedCents >= 0.0f ? " +" : " ";
+        analysis += juce::String(sample->detectedCents, 1) + " cents";
+    }
+    else
+    {
+        analysis += "; pitch not detected";
+    }
+
+    return analysis;
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout createGaldrParameterLayout()
@@ -150,6 +182,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout createGaldrParameterLayout()
         .withStringFromValueFunction([](float value, int)
         {
             return String(value, 1) + " /s";
+        });
+
+    const auto multiplier = AudioParameterFloatAttributes()
+        .withStringFromValueFunction([](float value, int)
+        {
+            return String(value, 2) + "x";
         });
 
     const auto midiNote = AudioParameterIntAttributes()
@@ -252,6 +290,43 @@ juce::AudioProcessorValueTreeState::ParameterLayout createGaldrParameterLayout()
         127,
         60,
         midiNote));
+
+    add(std::make_unique<AudioParameterFloat>(
+        ParameterID { pid::sampleSpeed, 1 },
+        "Sample Speed",
+        NormalisableRange<float>(0.25f, 4.0f, 0.0f, 0.35f),
+        1.0f,
+        multiplier));
+
+    add(std::make_unique<AudioParameterFloat>(
+        ParameterID { pid::samplePitch, 1 },
+        "Sample Pitch",
+        NormalisableRange<float>(-24.0f, 24.0f, 1.0f),
+        0.0f,
+        AudioParameterFloatAttributes().withStringFromValueFunction([](float value, int)
+        {
+            return String(value >= 0.0f ? "+" : "") + String(roundToInt(value)) + " st";
+        })));
+
+    add(std::make_unique<AudioParameterChoice>(
+        ParameterID { pid::stretchMode, 1 },
+        "Stretch Transients",
+        StringArray { "Smooth", "Transient", "Percussive" },
+        0));
+
+    add(std::make_unique<AudioParameterFloat>(
+        ParameterID { pid::sampleStart, 1 },
+        "Sample Start",
+        zeroOne,
+        0.0f,
+        percent));
+
+    add(std::make_unique<AudioParameterFloat>(
+        ParameterID { pid::sampleEnd, 1 },
+        "Sample End",
+        zeroOne,
+        1.0f,
+        percent));
 
     add(std::make_unique<AudioParameterChoice>(
     ParameterID { pid::grainMotion, 1 },
@@ -530,6 +605,11 @@ void GaldrAudioProcessor::updateSettings(int numSamples)
     settings.sampleMode     = (int) raw(pid::sampleMode);
     settings.sampleLvl      = raw(pid::sampleLvl);
     settings.sampleRoot     = (int) raw(pid::sampleRoot);
+    settings.sampleSpeed    = raw(pid::sampleSpeed);
+    settings.samplePitch    = raw(pid::samplePitch);
+    settings.stretchMode    = (int) raw(pid::stretchMode);
+    settings.sampleStart    = raw(pid::sampleStart);
+    settings.sampleEnd      = raw(pid::sampleEnd);
     settings.grainMotion    = (int) raw(pid::grainMotion);
     settings.grainSize      = raw(pid::grainSize);
     settings.grainDensity   = raw(pid::grainDensity);
@@ -996,6 +1076,9 @@ void GaldrAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
         for (int i = 0; i < synth.getNumVoices() && ! anyVoiceActive; ++i)
             anyVoiceActive = synth.getVoice(i)->isVoiceActive();
 
+        granularVoiceActive.store(anyVoiceActive,
+                                  std::memory_order_relaxed);
+
         const bool freeRunning = (int) raw(pid::bzGate) == 1;
         const float target = (freeRunning || anyVoiceActive) ? 1.0f : 0.0f;
         const float tau = target > bzGateEnv ? 0.04f : 0.25f;
@@ -1053,6 +1136,18 @@ void GaldrAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
         applyStateTree(tree);
 }
 
+void GaldrAudioProcessor::setLastEditorSize(int width, int height) noexcept
+{
+    editorWidth.store(width, std::memory_order_relaxed);
+    editorHeight.store(height, std::memory_order_relaxed);
+}
+
+juce::Point<int> GaldrAudioProcessor::getLastEditorSize() const noexcept
+{
+    return { editorWidth.load(std::memory_order_relaxed),
+             editorHeight.load(std::memory_order_relaxed) };
+}
+
 juce::ValueTree GaldrAudioProcessor::capturePresetState()
 {
     auto tree = apvts.copyState();
@@ -1091,6 +1186,8 @@ juce::ValueTree GaldrAudioProcessor::capturePresetState()
 juce::ValueTree GaldrAudioProcessor::captureFullState()
 {
     auto tree = capturePresetState();
+    tree.setProperty("editorWidth", editorWidth.load(std::memory_order_relaxed), nullptr);
+    tree.setProperty("editorHeight", editorHeight.load(std::memory_order_relaxed), nullptr);
     juce::ValueTree map("MIDIMAP");
     for (int cc = 0; cc < 128; ++cc)
         if (auto* p = midiCCMap[cc].load())
@@ -1115,6 +1212,12 @@ void GaldrAudioProcessor::applyStateTree(juce::ValueTree tree)
         return;
 
     migrateState(tree, (int) tree.getProperty("stateVersion", 0));
+    if (tree.hasProperty("editorWidth") && tree.hasProperty("editorHeight"))
+        setLastEditorSize((int) tree.getProperty("editorWidth"),
+                          (int) tree.getProperty("editorHeight"));
+
+    tree.removeProperty("editorWidth", nullptr);
+    tree.removeProperty("editorHeight", nullptr);
     const bool restoresSample =
         (bool) tree.getProperty("hasSampleState", false);
 

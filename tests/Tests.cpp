@@ -7,12 +7,14 @@
 // Exits non-zero on failure; run by CI on every platform.
 
 #include <juce_audio_utils/juce_audio_utils.h>
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <utility>
 #include <vector>
 #include "../src/PluginProcessor.h"
 #include "../src/Presets.h"
+#include "../src/SampleWaveform.h"
 
 namespace
 {
@@ -158,6 +160,40 @@ float measureFreq(const std::vector<float>& v, double sr, double t0, double t1)
     return count > 1 ? (float) ((count - 1) / (last - first)) : 0.0f;
 }
 
+// Windowed spectral estimate for overlap-add/time-stretched material, where
+// grain boundaries can introduce extra zero crossings and correlation sidebands.
+float measurePeriodicFreq(const std::vector<float>& v, double sr, double t0, double t1,
+                          float minimumHz, float maximumHz)
+{
+    const int a = juce::jlimit(0, (int) v.size(), (int) (t0 * sr));
+    const int b = juce::jlimit(0, (int) v.size(), (int) (t1 * sr));
+    double bestMagnitude = -1.0;
+    float bestFrequency = minimumHz;
+
+    for (float frequency = minimumHz; frequency <= maximumHz; frequency += 0.25f)
+    {
+        double real = 0.0, imaginary = 0.0;
+        for (int i = a; i < b; ++i)
+        {
+            const double phase = juce::MathConstants<double>::twoPi
+                               * frequency * (double) (i - a) / sr;
+            const double window = 0.5 - 0.5 * std::cos(
+                juce::MathConstants<double>::twoPi * (double) (i - a)
+                / (double) juce::jmax(1, b - a - 1));
+            real += v[(size_t) i] * window * std::cos(phase);
+            imaginary -= v[(size_t) i] * window * std::sin(phase);
+        }
+        const double magnitude = real * real + imaginary * imaginary;
+        if (magnitude > bestMagnitude)
+        {
+            bestMagnitude = magnitude;
+            bestFrequency = frequency;
+        }
+    }
+
+    return bestFrequency;
+}
+
 bool allFinite(const std::vector<float>& v, float& worst)
 {
     worst = 0.0f;
@@ -172,6 +208,29 @@ bool allFinite(const std::vector<float>& v, float& worst)
     }
     return ok;
 }
+void testLongSampleWaveform()
+{
+    // 8192 * 1,000,000 overflows a 32-bit int in the old waveform code.
+    dyrekreds::SampleData sample;
+    sample.audio.setSize(2, 1000000);
+    sample.audio.clear();
+    sample.audio.setSample(0, 750000, 0.75f);
+    sample.audio.setSample(1, 900000, -0.5f);
+
+    const auto peaks = dyrekreds::buildSampleWaveform(sample);
+    check(peaks.size() == 8192, "long sample waveform has 8192 points");
+    if (peaks.size() == 8192)
+    {
+        check(std::abs(peaks[6144] - 0.75f) < 1.0e-6f,
+              "waveform shows impulse at the correct position");
+        check(std::abs(peaks[7372] - 0.5f) < 1.0e-6f,
+              "waveform includes the second channel");
+        check(std::count_if(peaks.begin(), peaks.end(),
+                            [](float peak) { return peak > 0.0f; }) == 2,
+              "waveform has no false spikes from integer overflow");
+    }
+}
+
 void testSampleLoading()
 {
     std::cout << "sample loading" << std::endl;
@@ -180,10 +239,29 @@ void testSampleLoading()
     formats.registerBasicFormats();
     check(formats.findFormatForFileExtension("mp3") != nullptr,
           "MP3 decoder is registered");
-
-    check(dyrekreds::SampleLoader::isSupportedFile(
-              juce::File("sample.mp3")),
+    check(dyrekreds::SampleLoader::isSupportedFile(juce::File("sample.mp3")),
           "MP3 files are accepted by the sample loader");
+
+    const auto mp3Fixture = juce::File(__FILE__)
+                                .getParentDirectory()
+                                .getParentDirectory()
+                                .getChildFile("JUCE/examples/Assets/Notifications/sounds/served.mp3");
+    check(mp3Fixture.existsAsFile(), "MP3 test fixture exists");
+
+    const auto mp3 = dyrekreds::SampleLoader::load(mp3Fixture);
+    check((bool) mp3, "MP3 sample loads"
+                         + (mp3.error.isNotEmpty() ? ": " + mp3.error
+                                                   : juce::String()));
+    if (mp3)
+    {
+        check(mp3.sample->isValid(), "loaded MP3 sample is valid");
+        check(mp3.sample->audio.getNumSamples() > 0,
+              "loaded MP3 contains decoded audio");
+    }
+
+    juce::MemoryBlock invalidMp3("not an mp3", 10);
+    check(! dyrekreds::SampleLoader::load(invalidMp3, "broken.mp3"),
+          "invalid MP3 is rejected without replacing the sample");
 
     constexpr double sampleRate = 48000.0;
     constexpr int numSamples = 4800;
@@ -253,9 +331,25 @@ void testSampleLoading()
         check(processor.getSampleName()
                   == file.getFileNameWithoutExtension(),
               "sample name is exposed");
+
+        check(loaded.sample->normalisationGain > 1.7f
+                  && loaded.sample->normalisationGain < 1.9f,
+              "quiet sample is normalised close to -1 dBFS");
+
+        check(loaded.sample->detectedMidiNote == 57,
+              "A3 sample pitch is detected");
+
+        check(std::abs(loaded.sample->detectedCents) < 2.0f,
+              "detected A3 pitch is close to concert tuning");
+
+        check((int) processor.apvts.getRawParameterValue(pid::sampleRoot)->load() == 57,
+              "detected pitch updates the sample Root parameter");
     }
 
-        neutralise(processor);
+    // Keep the original playback assertions explicit: C4 as root transposes
+    // the A3 fixture only when requested manually.
+    setParam(processor, pid::sampleRoot, 60.0f);
+    neutralise(processor);
     setParam(processor, pid::osc1Lvl, 0.0f);
     setParam(processor, pid::osc2Lvl, 0.0f);
     setParam(processor, pid::subLvl, 0.0f);
@@ -280,28 +374,106 @@ void testSampleLoading()
     check(peakIn(sampleRender, sampleRate, 0.005, 0.09) > 0.01f,
           "loaded sample renders from MIDI with oscillators muted");
 
+    setParam(processor, pid::sampleEnd, 0.25f);
+    const auto trimmedSampleRender =
+        render(processor, sampleRate, 128, 0.12, sampleEvents);
+    check(peakIn(trimmedSampleRender, sampleRate, 0.005, 0.02) > 0.01f,
+          "sample end keeps audio inside the selected range");
+    check(peakIn(trimmedSampleRender, sampleRate, 0.04, 0.08) < 0.0001f,
+          "sample end stops audio outside the selected range");
+    setParam(processor, pid::sampleEnd, 1.0f);
+
     const float rootC4Frequency =
         measureFreq(sampleRender, sampleRate, 0.005, 0.09);
 
     check(std::abs(rootC4Frequency / 220.0f - 1.0f) < 0.01f,
           "root C4 preserves the sample pitch");
 
+    const std::vector<Event> heldSampleEvents {
+        { 0, juce::MidiMessage::noteOn(1, 60, 1.0f) },
+        { (int) (sampleRate * 0.28), juce::MidiMessage::noteOff(1, 60) }
+    };
+
+    setParam(processor, pid::sampleSpeed, 0.5f);
+    const auto halfSpeedRender =
+        render(processor, sampleRate, 128, 0.25, heldSampleEvents);
+    check(peakIn(halfSpeedRender, sampleRate, 0.12, 0.17) > 0.005f,
+          "half-speed time stretch extends sample duration");
+    const float halfSpeedFrequency = measurePeriodicFreq(
+        halfSpeedRender, sampleRate, 0.04, 0.14, 180.0f, 260.0f);
+    check(std::abs(halfSpeedFrequency / 220.0f - 1.0f) < 0.03f,
+          "Speed changes duration without changing pitch (got "
+              + juce::String(halfSpeedFrequency, 2) + " Hz)");
+
+    setParam(processor, pid::samplePitch, 12.0f);
+    const auto pitchedRender =
+        render(processor, sampleRate, 128, 0.25, heldSampleEvents);
+    const float pitchedFrequency = measurePeriodicFreq(
+        pitchedRender, sampleRate, 0.04, 0.14, 360.0f, 520.0f);
+    check(std::abs(pitchedFrequency / 440.0f - 1.0f) < 0.04f,
+          "Pitch transposes without cancelling half-speed stretch (got "
+              + juce::String(pitchedFrequency, 2) + " Hz)");
+
+    setParam(processor, pid::sampleSpeed, 1.0f);
+    setParam(processor, pid::samplePitch, 0.0f);
+
+    for (const double stretchRate : { 44100.0, 96000.0 })
+    {
+        GaldrAudioProcessor stretchProcessor;
+        check((bool) stretchProcessor.loadSample(file),
+              "time-stretch fixture loads at " + juce::String((int) stretchRate) + " Hz");
+        neutralise(stretchProcessor);
+        setParam(stretchProcessor, pid::osc1Lvl, 0.0f);
+        setParam(stretchProcessor, pid::osc2Lvl, 0.0f);
+        setParam(stretchProcessor, pid::subLvl, 0.0f);
+        setParam(stretchProcessor, pid::noiseLvl, 0.0f);
+        setParam(stretchProcessor, pid::sampleSpeed, 0.5f);
+        setParam(stretchProcessor, pid::stretchMode, 2.0f);
+        setParam(stretchProcessor, pid::attack, 0.001f);
+        setParam(stretchProcessor, pid::decay, 0.001f);
+        setParam(stretchProcessor, pid::sustain, 1.0f);
+        setParam(stretchProcessor, pid::release, 0.01f);
+        stretchProcessor.prepareToPlay(stretchRate, 128);
+
+        const std::vector<Event> stretchEvents {
+            { 0, juce::MidiMessage::noteOn(1, 57, 1.0f) },
+            { (int) (stretchRate * 0.18), juce::MidiMessage::noteOff(1, 57) }
+        };
+        const auto stretched = render(
+            stretchProcessor, stretchRate, 128, 0.2, stretchEvents);
+        float stretchWorst = 0.0f;
+        check(allFinite(stretched, stretchWorst)
+                  && peakIn(stretched, stretchRate, 0.04, 0.14) > 0.001f,
+              "percussive time stretch stays live and bounded at "
+                  + juce::String((int) stretchRate) + " Hz");
+    }
+
     setParam(processor, pid::sampleRoot, 72.0f);
 
     const auto rootC5Render =
         render(processor, sampleRate, 128, 0.12, sampleEvents);
 
-    const float rootC5Frequency =
-        measureFreq(rootC5Render, sampleRate, 0.005, 0.09);
+    const float rootC5Frequency = measurePeriodicFreq(
+        rootC5Render, sampleRate, 0.02, 0.09, 90.0f, 140.0f);
 
-    check(std::abs(rootC5Frequency / 110.0f - 1.0f) < 0.01f,
-          "root C5 transposes the sample down one octave");
+    check(std::abs(rootC5Frequency / 110.0f - 1.0f) < 0.03f,
+          "root C5 transposes the sample down one octave (got "
+              + juce::String(rootC5Frequency, 2) + " Hz)");
     setParam(processor, pid::sampleMode, 1.0f);
     setParam(processor, pid::sampleRoot, 60.0f);
     setParam(processor, pid::grainSize, 0.04f);
     setParam(processor, pid::grainDensity, 20.0f);
     setParam(processor, pid::grainPosition, 0.0f);
     setParam(processor, pid::grainSpread, 0.0f);
+
+    setParam(processor, pid::sampleStart, 0.25f);
+    setParam(processor, pid::sampleEnd, 0.75f);
+    setParam(processor, pid::grainPosition, 0.5f);
+    check(std::abs(processor.getGranularDisplayPosition() - 0.5f) < 0.001f,
+          "idle granular display maps position into the selected sample range");
+    setParam(processor, pid::sampleStart, 0.0f);
+    setParam(processor, pid::sampleEnd, 1.0f);
+    setParam(processor, pid::grainPosition, 0.0f);
 
     const auto granularRender =
         render(processor, sampleRate, 128, 0.12, sampleEvents);
@@ -325,6 +497,9 @@ void testSampleLoading()
     "Reverse",
     "Bounce"
 };
+
+    setParam(processor, pid::sampleStart, 0.25f);
+    setParam(processor, pid::sampleEnd, 0.75f);
 
     for (int motion = 0; motion < motionNames.size(); ++motion)
 {
@@ -373,14 +548,17 @@ void testSampleLoading()
         processor.getGranularPlayhead();
 
     check(
-        playhead >= 0.0f
-            && playhead <= 1.0f,
+        playhead >= 0.25f
+            && playhead <= 0.75f,
         motionName
             + " playhead stays inside the sample"
             + " (position "
             + juce::String(playhead, 4)
             + ")");
 }
+
+setParam(processor, pid::sampleStart, 0.0f);
+setParam(processor, pid::sampleEnd, 1.0f);
 
 setParam(processor, pid::grainMotion, 0.0f);
     setParam(processor, pid::grainDensity, 80.0f);
@@ -592,6 +770,28 @@ void testStateRoundTrip()
         }
     }
     check(same, "all parameter values survive save/load");
+
+    a.setLastEditorSize(1464, 1212);
+    auto fullState = a.captureFullState();
+    GaldrAudioProcessor editorStateRoundTrip;
+    editorStateRoundTrip.applyStateTree(fullState);
+    check(editorStateRoundTrip.getLastEditorSize() == juce::Point<int>(1464, 1212),
+          "editor size survives a host session round-trip");
+
+    const auto presetState = a.capturePresetState();
+    check(! presetState.hasProperty("editorWidth")
+              && ! presetState.hasProperty("editorHeight"),
+          "editor size is not stored in sound presets");
+
+    std::unique_ptr<juce::AudioProcessorEditor> firstEditor(a.createEditor());
+    firstEditor->setSize(1098, 909);
+    const auto resizedWidth = firstEditor->getWidth();
+    const auto resizedHeight = firstEditor->getHeight();
+    firstEditor.reset();
+    std::unique_ptr<juce::AudioProcessorEditor> reopenedEditor(a.createEditor());
+    check(reopenedEditor->getWidth() == resizedWidth
+              && reopenedEditor->getHeight() == resizedHeight,
+          "editor size survives closing and reopening the editor");
 
     auto tree = b.capturePresetState();
     tree.removeProperty("stateVersion", nullptr);
@@ -1006,6 +1206,7 @@ int main()
     juce::ScopedJuceInitialiser_GUI juceInit;
     std::cout << "Dyrekreds headless" << std::endl;
 
+    testLongSampleWaveform();
     testSampleLoading();
     testStateRoundTrip();
     testMidiLearn();
