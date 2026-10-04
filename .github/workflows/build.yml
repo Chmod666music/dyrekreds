@@ -223,6 +223,14 @@ jobs:
         run: |
           mkdir dist
           stage=build/Dyrekreds_artefacts/Release
+          # Releases use the exact tag (for example v0.9.0-beta.15).
+          # Branch artifacts use the commit ID, so branch names with slashes
+          # never turn into unintended package paths.
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            version="$GITHUB_REF_NAME"
+          else
+            version="dev-${GITHUB_SHA:0:7}"
+          fi
           cp LICENSE "$stage/LICENSE.txt"
           cp NOTICE.txt "$stage/NOTICE.txt"
           mkdir "$stage/licenses"
@@ -236,11 +244,15 @@ jobs:
           for d in VST3 CLAP AU Standalone; do
             [ -d "$d" ] && dirs="$dirs $d"
           done
+          if find $dirs -type f -iname '*.mp3' -print -quit | grep -q .; then
+            echo "Refusing to package an MP3 file. Release packages contain plug-ins and documentation only." >&2
+            exit 1
+          fi
           if [ "$RUNNER_OS" = "Windows" ]; then
-            cmake -E tar cf "../../../dist/Dyrekreds-Windows.zip" --format=zip $dirs
+            cmake -E tar cf "../../../dist/Dyrekreds-$version-$RUNNER_OS.zip" --format=zip $dirs
           else
             # tar preserves the executable bits that zip would lose
-            tar czf "../../../dist/Dyrekreds-$RUNNER_OS.tar.gz" $dirs
+            tar czf "../../../dist/Dyrekreds-$version-$RUNNER_OS.tar.gz" $dirs
           fi
 
       - uses: actions/upload-artifact@v4
@@ -266,4 +278,4 @@ jobs:
           prerelease: ${{ contains(github.ref_name, '-') }}
           generate_release_notes: true
           files: |
-            dist/Dyrekreds-*
+            dist/Dyrekreds-${{ github.ref_name }}-*
