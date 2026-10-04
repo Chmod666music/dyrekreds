@@ -129,6 +129,9 @@ jobs:
           certificate="$RUNNER_TEMP/developer-id.p12"
           compatible_certificate="$RUNNER_TEMP/developer-id-compatible.p12"
           rewrap_error="$RUNNER_TEMP/developer-id-rewrap.err"
+          leaf_certificate="$RUNNER_TEMP/developer-id-leaf.pem"
+          private_key="$RUNNER_TEMP/developer-id-key.pem"
+          certificate_chain="$RUNNER_TEMP/developer-id-chain.pem"
           keychain="$RUNNER_TEMP/dyrekreds-signing.keychain-db"
           if ! printf '%s' "$MACOS_CERTIFICATE_BASE64" | base64 --decode > "$certificate"; then
             echo "MACOS_CERTIFICATE_BASE64 is not valid base64." >&2
@@ -152,8 +155,20 @@ jobs:
           # Nothing is printed: both the source and temporary re-wrapped P12
           # stay in RUNNER_TEMP and retain the existing secret password.
           set -o pipefail
-          if ! openssl pkcs12 -legacy -in "$certificate" -passin env:MACOS_CERTIFICATE_PASSWORD -noenc 2>"$rewrap_error" \
-            | openssl pkcs12 -export -out "$compatible_certificate" -passout env:MACOS_CERTIFICATE_PASSWORD > /dev/null 2>>"$rewrap_error"; then
+          if ! openssl pkcs12 -legacy -in "$certificate" -passin env:MACOS_CERTIFICATE_PASSWORD -clcerts -nokeys -out "$leaf_certificate" 2>"$rewrap_error" \
+            || ! openssl pkcs12 -legacy -in "$certificate" -passin env:MACOS_CERTIFICATE_PASSWORD -nocerts -noenc -out "$private_key" 2>>"$rewrap_error" \
+            || ! openssl pkcs12 -legacy -in "$certificate" -passin env:MACOS_CERTIFICATE_PASSWORD -cacerts -nokeys -out "$certificate_chain" 2>>"$rewrap_error"; then
+            echo "Could not extract the certificate material from the decoded P12." >&2
+            openssl version >&2
+            sed -n '1,20p' "$rewrap_error" >&2
+            exit 1
+          fi
+          test -s "$leaf_certificate" || { echo "The decoded P12 does not contain a leaf certificate." >&2; exit 1; }
+          test -s "$private_key" || { echo "The decoded P12 does not contain a private key." >&2; exit 1; }
+          chain_args=()
+          [ -s "$certificate_chain" ] && chain_args=(-certfile "$certificate_chain")
+          if ! openssl pkcs12 -export -out "$compatible_certificate" -passout env:MACOS_CERTIFICATE_PASSWORD \
+            -inkey "$private_key" -in "$leaf_certificate" "${chain_args[@]}" > /dev/null 2>>"$rewrap_error"; then
             echo "Could not re-wrap the decoded P12 in the macOS-compatible PKCS#12 format." >&2
             openssl version >&2
             sed -n '1,20p' "$rewrap_error" >&2
